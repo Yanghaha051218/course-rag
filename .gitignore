@@ -21,6 +21,10 @@ venv/
 node_modules/
 .next/
 out/
+.turbo/
+*.tsbuildinfo
+/frontend/AGENTS.md
+/frontend/CLAUDE.md
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
@@ -35,10 +39,15 @@ yarn-error.log*
 /runtime/*.db-*
 /runtime/*.sqlite
 /runtime/*.sqlite3
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+qdrant_storage/
+.qdrant/
 
 # Editor and operating-system files
 .DS_Store
 .idea/
 .vscode/
 *.swp
-
