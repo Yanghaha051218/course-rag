@@ -1,0 +1,44 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Node.js and Next.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+/runtime/uploads/*
+!/runtime/uploads/.gitkeep
+/runtime/qdrant/*
+!/runtime/qdrant/.gitkeep
+/runtime/*.db
+/runtime/*.db-*
+/runtime/*.sqlite
+/runtime/*.sqlite3
+
+# Editor and operating-system files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+

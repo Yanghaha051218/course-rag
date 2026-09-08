@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=80,<81"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "course-rag-backend"
+version = "0.1.0"
+description = "FastAPI backend for CourseRAG"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.116,<1.0",
+  "pydantic-settings>=2.10,<3.0",
+  "uvicorn[standard]>=0.35,<1.0",
+]
+
+[project.optional-dependencies]
+test = [
+  "httpx>=0.28,<1.0",
+  "pytest>=8.4,<10.0",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["../tests/backend"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
