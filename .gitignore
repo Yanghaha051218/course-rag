@@ -23,6 +23,7 @@ node_modules/
 out/
 .turbo/
 *.tsbuildinfo
+/frontend/next-env.d.ts
 /frontend/AGENTS.md
 /frontend/CLAUDE.md
 npm-debug.log*
