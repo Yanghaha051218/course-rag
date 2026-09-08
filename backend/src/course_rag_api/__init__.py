@@ -1,2 +1,1 @@
 """CourseRAG backend package."""
-
