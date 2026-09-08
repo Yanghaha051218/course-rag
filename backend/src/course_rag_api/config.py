@@ -10,11 +10,6 @@ class Settings(BaseSettings):
 
     app_name: str = "CourseRAG API"
     environment: Literal["development", "test", "production"] = "development"
-    host: str = "127.0.0.1"
-    port: int = 8000
-    log_level: Literal["critical", "error", "warning", "info", "debug", "trace"] = (
-        "info"
-    )
     openai_api_key: SecretStr | None = None
 
     model_config = SettingsConfigDict(
@@ -28,4 +23,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-
