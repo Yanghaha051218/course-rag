@@ -10,7 +10,7 @@
     "typecheck": "next typegen && tsc --noEmit"
   },
   "engines": {
-    "node": ">=20.9"
+    "node": ">=22.13"
   },
   "packageManager": "pnpm@11.19.0",
   "dependencies": {

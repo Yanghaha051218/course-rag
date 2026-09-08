@@ -74,7 +74,7 @@ course-rag/
 ## Prerequisites
 
 - Python 3.11 or newer (CI uses Python 3.12).
-- Node.js 20.9 or newer (CI uses Node.js 24).
+- Node.js 22.13 or newer (CI uses Node.js 24).
 - pnpm 11.19.0.
 
 ## Start from a clean clone
