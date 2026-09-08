@@ -1,0 +1,6 @@
+Synthetic practice facts
+
+The made-up term "quiet sum" means the pebble count recorded at a checkpoint.
+For the sequence blue, amber, blue, the final pebble count is three.
+
+These statements were authored only as a tiny software-test fixture.

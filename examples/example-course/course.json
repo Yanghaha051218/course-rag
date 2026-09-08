@@ -1,0 +1,9 @@
+{
+  "id": "synthetic-tiny-systems",
+  "title": "Tiny Systems 101",
+  "description": "Original placeholder material for closed-corpus tests.",
+  "materials": [
+    "materials/counter-notes.md",
+    "materials/practice.txt"
+  ]
+}
