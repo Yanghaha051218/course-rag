@@ -1,9 +1,14 @@
 {
   "id": "synthetic-tiny-systems",
-  "title": "Tiny Systems 101",
-  "description": "Original placeholder material for closed-corpus tests.",
+  "title": "Tiny Systems and Orbital Gardening",
+  "description": "Original synthetic material for ingestion and isolation tests.",
   "materials": [
     "materials/counter-notes.md",
     "materials/practice.txt"
+  ],
+  "generated_materials": [
+    "orbital-gardening.pdf",
+    "orbital-gardening.pptx",
+    "orbital-gardening.docx"
   ]
 }

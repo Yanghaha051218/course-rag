@@ -8,12 +8,12 @@ abstain instead of filling gaps with a model's pretrained knowledge.
 
 ## Status
 
-**Early development — Milestone 0 only.**
+**Early development — Milestone 1-A.**
 
-The repository currently contains a minimal FastAPI health endpoint, a minimal
-Next.js landing page, tests, documentation, synthetic fixtures, and CI. Document
-ingestion, retrieval, evidence gating, model calls, citations, and persistence
-are planned and are not implemented yet.
+The repository now implements local document ingestion, source-aware parsing,
+deterministic chunking, SQLite metadata persistence, a developer CLI, tests,
+synthetic fixtures, and CI. Embeddings, retrieval, evidence gating, model calls,
+citations, and question answering are not implemented yet.
 
 ## Grounding principle
 
@@ -32,13 +32,13 @@ Grounding will be enforced in backend control flow as well as in model
 instructions. Prompting alone is not considered an enforcement boundary. See
 [the grounding policy](docs/grounding-policy.md) for the normative rules.
 
-## Planned architecture
+## Architecture
 
 - **Frontend:** Next.js and TypeScript.
 - **Backend:** FastAPI and Python.
-- **Application metadata:** SQLite.
+- **Application metadata:** SQLite for courses, documents, and chunks.
 - **Vector storage:** Qdrant, partitioned and filtered by course.
-- **Document formats:** PDF, PPTX, DOCX, Markdown, and text.
+- **Document formats:** PDF, PPTX, DOCX, Markdown, and text are ingestible.
 - **Models:** provider interfaces for embeddings and generation, with OpenAI as
   an initial provider.
 - **Quality gates:** retrieval sufficiency, course-isolation checks, citation
@@ -47,15 +47,22 @@ instructions. Prompting alone is not considered an enforcement boundary. See
 The fuller component and data-flow design is in
 [docs/architecture.md](docs/architecture.md).
 
+## Implemented in Milestone 1-A
+
+- Course creation and course-owned document metadata.
+- PDF page, PPTX slide, DOCX paragraph, Markdown, and text parsing.
+- Deterministic word-budget chunking with overlap and source ranges.
+- Transactional SQLite persistence and same-course duplicate detection.
+- Developer-facing ingestion CLI.
+
 ## Planned features
 
-- Course creation and isolated document collections.
-- Safe ingestion and parsing for the planned document formats.
-- Chunking, embeddings, and course-filtered retrieval.
+- Embeddings and course-filtered vector retrieval.
 - Evidence sufficiency checks before any generation request.
 - Answers with locatable citations into the source materials.
 - Explicit unsupported or insufficient-evidence responses.
 - Pluggable embedding and generation providers.
+- Question-answering and chat interfaces.
 
 These are roadmap items, not claims about the current implementation.
 
@@ -65,7 +72,7 @@ These are roadmap items, not claims about the current implementation.
 course-rag/
 ├── backend/                 FastAPI application and Python package metadata
 ├── frontend/                Next.js TypeScript application
-├── docs/                    Architecture and grounding policy
+├── docs/                    Architecture, grounding, and ingestion behavior
 ├── examples/example-course Tiny original test-only course materials
 ├── runtime/                 Local uploads, databases, and vector data (ignored)
 └── tests/backend/           Backend API tests
@@ -130,8 +137,28 @@ Run all commands from the repository root unless a step says otherwise.
 
    Open `http://127.0.0.1:3000`.
 
-No API key is required for Milestone 0. The OpenAI setting in `.env.example` is
+No API key is required for Milestone 1-A. The OpenAI setting in `.env.example` is
 reserved for a future provider and should remain empty for now.
+
+## Ingest documents locally
+
+Generate the optional synthetic binary examples under ignored runtime storage:
+
+```bash
+python examples/example-course/generate_documents.py runtime/example-course
+```
+
+Create a course, copy the printed course ID, then ingest a document:
+
+```bash
+course-rag create-course "Orbital Gardening Demo"
+course-rag ingest --course <course-id> runtime/example-course/orbital-gardening.pdf
+```
+
+The default database is `runtime/db/course-rag.sqlite3`. Configure its path,
+chunk sizes, overlap, and input-size limit through the `COURSE_RAG_*` settings
+shown in `.env.example`. See [docs/ingestion.md](docs/ingestion.md) for format
+and provenance details.
 
 ## Verification commands
 

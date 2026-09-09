@@ -4,8 +4,9 @@
 
 This policy defines what CourseRAG may treat as evidence and how it must behave
 when answering questions about a selected course. It is normative for future
-retrieval and answer-generation work; Milestone 0 establishes the policy but
-does not yet implement the RAG path.
+retrieval and answer-generation work. Milestone 1-A now preserves candidate
+evidence provenance, but retrieval and the answer-generation path remain
+unimplemented.
 
 ## Three distinct concepts
 
