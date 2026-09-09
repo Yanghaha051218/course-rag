@@ -38,6 +38,7 @@ yarn-error.log*
 !/runtime/qdrant/.gitkeep
 /runtime/db/
 /runtime/example-course/
+/runtime/evaluations/
 /runtime/*.db
 /runtime/*.db-*
 /runtime/*.sqlite

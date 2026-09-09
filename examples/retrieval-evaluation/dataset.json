@@ -1,0 +1,160 @@
+{
+  "chunk_target_size": 32,
+  "chunk_overlap": 4,
+  "courses": [
+    {
+      "key": "orbital-gardening",
+      "name": "Orbital Gardening Evaluation",
+      "documents": [
+        "../example-course/materials/orbital-gardening.md",
+        "materials/orbital-water.md",
+        "materials/orbital-orchids.md",
+        "materials/eclipse-protocol.md"
+      ]
+    },
+    {
+      "key": "marine-gardening",
+      "name": "Marine Gardening Evaluation",
+      "documents": [
+        "../marine-gardening-course/materials/marine-gardening.md",
+        "materials/marine-tides.md"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "label": "orbital-blueleaf-coefficient",
+      "category": "exact-answer",
+      "course": "orbital-gardening",
+      "query": "What is the Orbital Blueleaf coefficient?",
+      "answerable": true,
+      "expected_evidence": [
+        {
+          "filename": "orbital-gardening.md",
+          "chunk_index": 0,
+          "source_type": "section",
+          "source_start": 1,
+          "source_end": 2
+        }
+      ],
+      "forbidden_courses": ["marine-gardening"]
+    },
+    {
+      "label": "comet-moss-watering-paraphrase",
+      "category": "paraphrase",
+      "course": "orbital-gardening",
+      "query": "How often should gardeners give water to comet moss?",
+      "answerable": true,
+      "expected_evidence": [
+        {
+          "filename": "orbital-water.md",
+          "chunk_index": 0,
+          "source_type": "section",
+          "source_start": 1,
+          "source_end": 2
+        }
+      ],
+      "forbidden_courses": []
+    },
+    {
+      "label": "watering-and-orchid-alignment",
+      "category": "same-course cross-document",
+      "course": "orbital-gardening",
+      "query": "What are the comet moss watering interval and the night orchid heliostat rotation?",
+      "answerable": true,
+      "expected_evidence": [
+        {
+          "filename": "orbital-water.md",
+          "chunk_index": 0,
+          "source_type": "section",
+          "source_start": 1,
+          "source_end": 2
+        },
+        {
+          "filename": "orbital-orchids.md",
+          "chunk_index": 0,
+          "source_type": "section",
+          "source_start": 1,
+          "source_end": 2
+        }
+      ],
+      "forbidden_courses": []
+    },
+    {
+      "label": "eclipse-checkpoint-and-archive",
+      "category": "multi-chunk",
+      "course": "orbital-gardening",
+      "query": "Which eclipse checkpoint code and completion archive tag are recorded?",
+      "answerable": true,
+      "expected_evidence": [
+        {
+          "filename": "eclipse-protocol.md",
+          "chunk_index": 0,
+          "source_type": "section",
+          "source_start": 1,
+          "source_end": 3
+        },
+        {
+          "filename": "eclipse-protocol.md",
+          "chunk_index": 1,
+          "source_type": "section",
+          "source_start": 3,
+          "source_end": 4
+        }
+      ],
+      "forbidden_courses": []
+    },
+    {
+      "label": "unsupported-orbital-temperature",
+      "category": "unsupported query",
+      "course": "orbital-gardening",
+      "query": "What temperature is the orbital greenhouse at midnight?",
+      "answerable": false,
+      "expected_evidence": [],
+      "forbidden_courses": []
+    },
+    {
+      "label": "blueleaf-fertilizer-near-miss",
+      "category": "near-miss",
+      "course": "orbital-gardening",
+      "query": "Which fertilizer is prescribed for Orbital Blueleaf seedlings?",
+      "answerable": false,
+      "expected_evidence": [],
+      "forbidden_courses": ["marine-gardening"]
+    },
+    {
+      "label": "contradictory-blueleaf-course",
+      "category": "contradictory-course isolation",
+      "course": "marine-gardening",
+      "query": "What is the Marine Blueleaf coefficient?",
+      "answerable": true,
+      "expected_evidence": [
+        {
+          "filename": "marine-gardening.md",
+          "chunk_index": 0,
+          "source_type": "section",
+          "source_start": 1,
+          "source_end": 2
+        }
+      ],
+      "forbidden_courses": ["orbital-gardening"]
+    },
+    {
+      "label": "marine-ultraviolet-overlap",
+      "category": "vocabulary-overlap isolation",
+      "course": "marine-gardening",
+      "query": "How many hours of ultraviolet exposure do Marine solar vines receive?",
+      "answerable": true,
+      "expected_evidence": [
+        {
+          "filename": "marine-gardening.md",
+          "chunk_index": 0,
+          "source_type": "section",
+          "source_start": 1,
+          "source_end": 2
+        }
+      ],
+      "forbidden_courses": ["orbital-gardening"]
+    }
+  ]
+}

@@ -4,7 +4,7 @@
 
 This policy defines what CourseRAG may treat as evidence and how it must behave
 when answering questions about a selected course. It is normative for future
-retrieval and answer-generation work. Milestone 1-B returns raw, course-scoped
+retrieval and answer-generation work. Milestone 2-A measures raw, course-scoped
 candidate evidence with provenance, but does not yet decide evidence sufficiency
 or generate answers.
 
@@ -85,7 +85,7 @@ deterministic backend code.
 
 ## Evidence-sufficiency policy
 
-The concrete scoring and thresholds will be specified in Milestone 2 after
+The concrete scoring and thresholds will be specified in Milestone 2-B after
 retrieval evaluation. Whatever method is chosen must be deterministic at the
 orchestration boundary, testable without a live model, and conservative under
 ambiguity.

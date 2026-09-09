@@ -8,6 +8,11 @@ from qdrant_client import QdrantClient
 from course_rag_api.config import get_settings
 from course_rag_api.embeddings import create_embedding_provider
 from course_rag_api.errors import CourseRAGError
+from course_rag_api.evaluation import (
+    format_evaluation_report,
+    load_evaluation_dataset,
+    run_retrieval_evaluation,
+)
 from course_rag_api.indexing import IndexingService
 from course_rag_api.ingestion import ingest_document
 from course_rag_api.models import IndexingSummary
@@ -34,6 +39,10 @@ def _parser() -> argparse.ArgumentParser:
     retrieve.add_argument("--course", required=True)
     retrieve.add_argument("--query", required=True)
     retrieve.add_argument("--limit", type=int, default=5)
+    evaluate = commands.add_parser("evaluate-retrieval")
+    evaluate.add_argument("dataset", type=Path)
+    evaluate.add_argument("--limit", type=int, default=5)
+    evaluate.add_argument("--output", type=Path)
     return parser
 
 
@@ -49,6 +58,22 @@ def _print_index_summary(summary: IndexingSummary) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     settings = get_settings()
+    if args.command == "evaluate-retrieval":
+        try:
+            report = run_retrieval_evaluation(
+                load_evaluation_dataset(args.dataset),
+                create_embedding_provider(settings),
+                limit=args.limit,
+            )
+            print(format_evaluation_report(report))
+            if args.output is not None:
+                args.output.parent.mkdir(parents=True, exist_ok=True)
+                args.output.write_text(report.to_json(), encoding="utf-8")
+                print(f"JSON: {args.output}")
+            return 0
+        except (CourseRAGError, OSError, ValueError) as error:
+            print(f"Error: {error}", file=sys.stderr)
+            return 1
     store = SQLiteStore(args.database)
     try:
         if args.command == "create-course":

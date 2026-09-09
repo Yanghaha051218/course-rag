@@ -7,6 +7,11 @@ from course_rag_api.config import get_settings
 from course_rag_api.storage import SQLiteStore
 
 
+EVALUATION_DATASET = (
+    Path(__file__).parents[2] / "examples/retrieval-evaluation/dataset.json"
+)
+
+
 def test_cli_creates_course_and_ingests_document(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -95,4 +100,37 @@ def test_cli_indexes_and_retrieves_without_external_services(
     assert "blueleaf.txt" in output
     assert "section 1" in output
     assert "The Blueleaf coefficient is 7.25." in output
+    get_settings.cache_clear()
+
+
+def test_cli_evaluates_retrieval_and_writes_json(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_path = tmp_path / "evaluation.json"
+    monkeypatch.setenv("COURSE_RAG_EMBEDDING_PROVIDER", "deterministic")
+    monkeypatch.delenv("COURSE_RAG_EMBEDDING_MODEL", raising=False)
+    monkeypatch.delenv("COURSE_RAG_EMBEDDING_DIMENSION", raising=False)
+    get_settings.cache_clear()
+
+    assert (
+        main(
+            [
+                "evaluate-retrieval",
+                str(EVALUATION_DATASET),
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+
+    assert "Cases: 8 (answerable=6, unsupported=2)" in output
+    assert "Hit@1:" in output
+    assert "Hit@3:" in output
+    assert "Hit@5:" in output
+    assert "Isolation: PASS" in output
+    assert '"case_count": 8' in output_path.read_text()
     get_settings.cache_clear()

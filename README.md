@@ -8,13 +8,14 @@ abstain instead of filling gaps with a model's pretrained knowledge.
 
 ## Status
 
-**Early development — Milestone 1-B.**
+**Early development — Milestone 2-A.**
 
 The repository now implements local document ingestion, source-aware parsing,
 deterministic chunking, SQLite metadata persistence, embedding providers,
-Qdrant indexing, course-scoped vector retrieval, a developer CLI, tests,
-synthetic fixtures, and CI. Evidence gating, answer generation, final citations,
-and question answering are not implemented yet.
+Qdrant indexing, course-scoped vector retrieval, a deterministic retrieval
+evaluation harness, a developer CLI, tests, synthetic fixtures, and CI. Evidence
+gating, answer generation, final citations, and question answering are not
+implemented yet.
 
 ## Grounding principle
 
@@ -49,7 +50,7 @@ instructions. Prompting alone is not considered an enforcement boundary. See
 The fuller component and data-flow design is in
 [docs/architecture.md](docs/architecture.md).
 
-## Implemented through Milestone 1-B
+## Implemented through Milestone 2-A
 
 - Course creation and course-owned document metadata.
 - PDF page, PPTX slide, DOCX paragraph, Markdown, and text parsing.
@@ -58,6 +59,8 @@ The fuller component and data-flow design is in
 - Deterministic offline embeddings and an OpenAI embedding provider.
 - Idempotent Qdrant vector indexing with stable chunk UUIDs.
 - Required-course retrieval returning ranked, provenance-preserving chunks.
+- Offline retrieval evaluation with Hit@k, Recall@k, raw-score collection, and
+  explicit cross-course isolation checks.
 - Developer-facing ingestion CLI.
 
 ## Planned features
@@ -181,6 +184,20 @@ You can also run `course-rag index-document --document <document-id>`. Qdrant
 data defaults to ignored `runtime/qdrant/`. Retrieval prints similarity scores
 and source chunks; it does not generate an answer or apply an evidence threshold.
 See [docs/retrieval.md](docs/retrieval.md).
+
+## Evaluate retrieval
+
+Run the checked-in fictional benchmark without network access:
+
+```bash
+course-rag evaluate-retrieval \
+  examples/retrieval-evaluation/dataset.json \
+  --output runtime/evaluations/m2a.json
+```
+
+The report measures retrieval ranking and course isolation; it does not choose
+an evidence threshold or make a sufficiency decision. See
+[docs/retrieval-evaluation.md](docs/retrieval-evaluation.md).
 
 ## Verification commands
 

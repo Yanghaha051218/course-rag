@@ -2,10 +2,11 @@
 
 ## Scope and status
 
-Milestone 1-B implements local document parsing and persistence plus embedding,
-Qdrant indexing, and course-scoped retrieval behind a developer CLI. The
-FastAPI surface remains the Milestone 0 `/health` endpoint, and the Next.js page
-remains static. Components labelled **planned** do not exist yet.
+Milestone 2-A implements local document parsing and persistence, embedding,
+Qdrant indexing, course-scoped retrieval, and an offline retrieval-evaluation
+harness behind a developer CLI. The FastAPI surface remains the Milestone 0
+`/health` endpoint, and the Next.js page remains static. Components labelled
+**planned** do not exist yet.
 
 ## Primary invariant
 
@@ -39,6 +40,7 @@ flowchart TD
     E --> V[(Qdrant)]
     V --> R[Course-filtered Retriever]
     R --> O[RetrievedChunk array]
+    O --> M[Offline retrieval measurements]
     O --> F[Future evidence gate and generator]
 ```
 
@@ -48,7 +50,7 @@ flowchart TD
 
 The Next.js frontend will present course selection, document-management status,
 questions, answers, citations, and abstention states. It will communicate with
-the backend through typed HTTP contracts. It remains static in Milestone 1-B.
+the backend through typed HTTP contracts. It remains static in Milestone 2-A.
 
 ### API and orchestration
 
@@ -101,6 +103,14 @@ provider supports offline tests; OpenAI is the external embedding option.
 
 Generation providers remain planned. Credentials come from environment
 variables and are never stored in vectors, logs, fixtures, or Git.
+
+### Retrieval evaluation
+
+The evaluation runner creates temporary SQLite and in-memory Qdrant stores,
+reuses the production ingestion, indexing, and retrieval path, and reports
+Hit@k, Recall@k, raw scores, and course-isolation status. It makes no evidence
+sufficiency decision. The checked-in corpus and labels are synthetic and
+human-readable; optional JSON output belongs under ignored runtime storage.
 
 ### Evidence gate and citation validator (planned)
 

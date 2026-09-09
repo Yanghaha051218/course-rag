@@ -76,13 +76,14 @@ score. It is not a factual-confidence percentage.
 
 ## Current limitations
 
-- No retrieval-quality benchmark or semantic guarantee exists for the offline
-  hashing provider.
+- The small synthetic benchmark measures regression behavior, not a semantic
+  quality guarantee for the offline hashing provider.
 - No hybrid keyword search, reranking, query rewriting, or conversation history.
 - Course indexing currently loads one course's chunk metadata at once; add
   pagination only when measured course sizes require it.
 - This milestone configures embedded local Qdrant only, not a remote cluster.
-- No evidence threshold is applied; threshold calibration belongs to Milestone 2.
+- No evidence threshold is applied; threshold calibration belongs to Milestone
+  2-B.
 - No evidence gate, answer generation, final citation formatting, or chat UI.
 
 ## Official API references
