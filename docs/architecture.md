@@ -2,10 +2,10 @@
 
 ## Scope and status
 
-Milestone 1-A implements local document parsing, page-aware chunking, and SQLite
-metadata persistence behind a developer CLI. The FastAPI surface remains the
-Milestone 0 `/health` endpoint, and the Next.js page remains static. Components
-labelled **planned** do not exist yet.
+Milestone 1-B implements local document parsing and persistence plus embedding,
+Qdrant indexing, and course-scoped retrieval behind a developer CLI. The
+FastAPI surface remains the Milestone 0 `/health` endpoint, and the Next.js page
+remains static. Components labelled **planned** do not exist yet.
 
 ## Primary invariant
 
@@ -27,15 +27,19 @@ flowchart TD
 The `No` branch ends before provider invocation. A prompt asking a model to
 abstain is a useful secondary control, but it cannot replace this backend branch.
 
-The implemented ingestion path is separate from that future answer path:
+The implemented path stops at structured retrieval results:
 
 ```mermaid
-flowchart LR
+flowchart TD
     D[Course-owned document] --> P[Format parser]
     P --> U[SourceUnit with page, slide, or section]
     U --> K[Deterministic chunker]
     K --> S[(SQLite courses, documents, chunks)]
-    S --> F[Future embedding and indexing]
+    S --> E[EmbeddingProvider]
+    E --> V[(Qdrant)]
+    V --> R[Course-filtered Retriever]
+    R --> O[RetrievedChunk array]
+    O --> F[Future evidence gate and generator]
 ```
 
 ## Major components
@@ -44,8 +48,7 @@ flowchart LR
 
 The Next.js frontend will present course selection, document-management status,
 questions, answers, citations, and abstention states. It will communicate with
-the backend through typed HTTP contracts. It remains a static page in Milestone
-1-A and does not call the API.
+the backend through typed HTTP contracts. It remains static in Milestone 1-B.
 
 ### API and orchestration
 
@@ -67,9 +70,9 @@ The implemented ingestion pipeline:
 6. returns the existing document when the same checksum already belongs to the
    same course.
 
-No embeddings or vectors are produced. Uploaded documents remain untrusted
-input; the current CLI applies file-size and type limits and returns explicit
-errors. A production upload boundary is planned separately.
+Ingestion remains separate from indexing so embedding-provider failures do not
+affect document persistence. Uploaded documents remain untrusted input; the CLI
+applies file-size and type limits and returns explicit errors.
 
 ### Metadata store
 
@@ -79,24 +82,25 @@ chunks, preventing a chunk from claiming a different course than its document.
 Course-scoped indexes support later retrieval. Database files live under
 `runtime/` and are ignored by Git.
 
-### Vector store (planned)
+### Embedding and vector index
 
-Qdrant will store embeddings and retrieval payloads. Every vector must carry an
-immutable course identifier and document/chunk provenance. Retrieval must apply
-the selected course as a storage-level filter, and backend code must verify the
-course identifier of every returned item before evidence gating.
+Qdrant stores vectors and compact provenance payloads; authoritative chunk text
+remains in SQLite. Stable chunk UUIDs are Qdrant point IDs. One collection is
+derived from provider, model, dimension, and a configured prefix. Collection
+metadata is checked before use, so incompatible embeddings cannot mix.
 
-### Provider boundaries (planned)
+Every Qdrant query requires a course ID and applies it inside `query_points` as
+an exact payload filter. Returned payloads are then checked against SQLite;
+missing or contradictory provenance is an explicit consistency error.
 
-Small interfaces will separate orchestration from:
+### Provider boundary
 
-- embedding providers, which convert validated chunks or queries to vectors;
-- generation providers, which receive only a question, approved evidence, and
-  grounding instructions.
+The implemented `EmbeddingProvider` interface exposes provider/model identity,
+dimension, batch document embedding, and query embedding. The deterministic
+provider supports offline tests; OpenAI is the external embedding option.
 
-OpenAI is planned as an initial implementation. Provider configuration and
-credentials will come from environment variables; credentials must never be
-stored in code, prompts, logs, fixtures, or Git.
+Generation providers remain planned. Credentials come from environment
+variables and are never stored in vectors, logs, fixtures, or Git.
 
 ### Evidence gate and citation validator (planned)
 
@@ -118,8 +122,9 @@ Current and future defenses are layered:
 2. SQLite composite foreign keys prevent document/chunk course mismatches;
 3. the storage interface exposes chunk listing only with an explicit course ID;
 4. automated tests prove two courses remain distinct;
-5. future vector retrieval must apply an exact course filter; and
-6. future answer orchestration must reject mismatched results before prompting.
+5. Qdrant retrieval applies an exact `course_id` filter before returning hits;
+6. backend retrieval verifies Qdrant provenance against SQLite; and
+7. future answer orchestration must reject mismatched evidence before prompting.
 
 Documents or chunks from Course A must never appear in retrieval, prompts,
 answers, or citations for Course B.

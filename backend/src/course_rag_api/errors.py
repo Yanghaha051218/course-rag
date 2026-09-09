@@ -20,3 +20,23 @@ class CourseNotFoundError(CourseRAGError):
 
 class DocumentTooLargeError(CourseRAGError):
     pass
+
+
+class ConfigurationError(CourseRAGError):
+    pass
+
+
+class EmbeddingError(CourseRAGError):
+    pass
+
+
+class DocumentNotFoundError(CourseRAGError):
+    pass
+
+
+class IndexCompatibilityError(CourseRAGError):
+    pass
+
+
+class IndexConsistencyError(CourseRAGError):
+    pass

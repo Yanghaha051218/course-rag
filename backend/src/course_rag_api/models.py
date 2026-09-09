@@ -59,3 +59,26 @@ class IngestionSummary:
     source_unit_count: int
     chunk_count: int
     status: Literal["ingested", "duplicate"]
+
+
+@dataclass(frozen=True, slots=True)
+class IndexingSummary:
+    course_id: str
+    document_id: str | None
+    total_count: int
+    indexed_count: int
+    collection_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class RetrievedChunk:
+    chunk_id: str
+    course_id: str
+    document_id: str
+    filename: str
+    text: str
+    score: float
+    chunk_index: int
+    source_type: SourceType
+    source_start: int
+    source_end: int

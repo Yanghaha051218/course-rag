@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from course_rag_api.errors import CourseNotFoundError
+from course_rag_api.errors import CourseNotFoundError, DocumentNotFoundError
 from course_rag_api.models import Chunk, Course, Document
 
 
@@ -106,6 +106,20 @@ class SQLiteStore:
             ).fetchone()
         return None if row is None else Document(**dict(row))
 
+    def get_document(self, document_id: str) -> Document:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT id, course_id, filename, file_type, source_path, checksum,
+                       page_or_unit_count, created_at
+                FROM documents WHERE id = ?
+                """,
+                (document_id,),
+            ).fetchone()
+        if row is None:
+            raise DocumentNotFoundError(f"Document does not exist: {document_id}")
+        return Document(**dict(row))
+
     def persist_document(
         self, document: Document, chunks: Sequence[Chunk]
     ) -> None:
@@ -176,6 +190,49 @@ class SQLiteStore:
                 (course_id,),
             ).fetchall()
         return tuple(Chunk(**dict(row)) for row in rows)
+
+    def list_document_chunks(
+        self, course_id: str, document_id: str
+    ) -> tuple[Chunk, ...]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, course_id, document_id, text, chunk_index, source_type,
+                       source_start, source_end, created_at
+                FROM chunks
+                WHERE course_id = ? AND document_id = ?
+                ORDER BY chunk_index
+                """,
+                (course_id, document_id),
+            ).fetchall()
+        return tuple(Chunk(**dict(row)) for row in rows)
+
+    def get_chunks_with_filenames(
+        self, course_id: str, chunk_ids: Sequence[str]
+    ) -> dict[str, tuple[Chunk, str]]:
+        if not chunk_ids:
+            return {}
+        placeholders = ", ".join("?" for _ in chunk_ids)
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT c.id, c.course_id, c.document_id, c.text, c.chunk_index,
+                       c.source_type, c.source_start, c.source_end, c.created_at,
+                       d.filename
+                FROM chunks AS c
+                JOIN documents AS d
+                  ON d.id = c.document_id AND d.course_id = c.course_id
+                WHERE c.course_id = ? AND c.id IN ({placeholders})
+                """,
+                (course_id, *chunk_ids),
+            ).fetchall()
+        records: dict[str, tuple[Chunk, str]] = {}
+        for row in rows:
+            values = dict(row)
+            filename = values.pop("filename")
+            chunk = Chunk(**values)
+            records[chunk.id] = (chunk, filename)
+        return records
 
     def count_document_chunks(self, course_id: str, document_id: str) -> int:
         with self._connect() as connection:

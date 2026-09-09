@@ -74,5 +74,6 @@ database, including a temporary database for testing.
 - DOCX tables are not extracted and DOCX page numbers are unavailable.
 - Markdown is treated as text blocks; its syntax is not converted into a full
   semantic document tree.
-- No embeddings, Qdrant, retrieval, generation, or upload UI exist in this
-  milestone.
+- Embedding and retrieval are separate commands; ingestion never calls an
+  external embedding provider automatically.
+- No generation, evidence gate, OCR, or upload UI exists yet.

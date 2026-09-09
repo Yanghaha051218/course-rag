@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,8 +11,19 @@ class Settings(BaseSettings):
 
     app_name: str = "CourseRAG API"
     environment: Literal["development", "test", "production"] = "development"
-    openai_api_key: SecretStr | None = None
+    openai_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "OPENAI_API_KEY", "COURSE_RAG_OPENAI_API_KEY"
+        ),
+    )
     database_path: Path = Path("runtime/db/course-rag.sqlite3")
+    qdrant_path: Path = Path("runtime/qdrant")
+    qdrant_collection_prefix: str = Field(default="course_rag", min_length=1)
+    embedding_provider: Literal["deterministic", "openai"] = "deterministic"
+    embedding_model: str | None = Field(default=None, min_length=1)
+    embedding_dimension: int | None = Field(default=None, gt=0)
+    embedding_batch_size: int = Field(default=64, gt=0)
     chunk_target_size: int = Field(default=600, gt=0)
     chunk_overlap: int = Field(default=100, ge=0)
     max_document_bytes: int = Field(default=50 * 1024 * 1024, gt=0)

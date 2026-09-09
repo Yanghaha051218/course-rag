@@ -4,7 +4,8 @@
   "description": "Original synthetic material for ingestion and isolation tests.",
   "materials": [
     "materials/counter-notes.md",
-    "materials/practice.txt"
+    "materials/practice.txt",
+    "materials/orbital-gardening.md"
   ],
   "generated_materials": [
     "orbital-gardening.pdf",
