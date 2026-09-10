@@ -73,4 +73,6 @@ threshold is only a reproducible synthetic baseline. It does not prove reliable
 grounded answering or a hallucination rate. The current holdout result must be
 read as an evaluation finding, not tuned away by editing holdout labels.
 
-Generation and generated-answer citation validation remain disabled.
+The M3-B grounded-generation service uses Support Verification rather than this
+similarity baseline as its prerequisite; it validates returned citations against
+the verifier-approved chunk IDs.

@@ -11,9 +11,11 @@ from course_rag_api.evaluation import (
     load_evaluation_dataset,
     run_retrieval_evaluation,
     score_case,
+    summarize_generation_evaluation,
     summarize_support_verification,
     summarize_results,
 )
+from course_rag_api.generation import Citation, FinalResponse, FinalStatus
 from course_rag_api.models import RetrievedChunk
 from course_rag_api.support import SupportDecision, SupportStatus
 
@@ -277,3 +279,69 @@ def test_support_verification_metrics_remain_separate_from_retrieval_metrics() -
     assert metrics.answerable_support_rate == 1.0
     assert metrics.unsupported_false_support_rate == 0.0
     assert metrics.conflict_detection_rate == 1.0
+
+
+def test_generation_metrics_keep_answer_and_abstention_outcomes_separate() -> None:
+    answerable = EvaluationCase(
+        label="answerable",
+        category="exact-answer",
+        course="orbital",
+        query="What is the coefficient?",
+        answerable=True,
+        expected_evidence=(EvidenceRef("alpha.md", 0, "section", 1, 1),),
+        forbidden_courses=("marine",),
+    )
+    unsupported = EvaluationCase(
+        label="unsupported",
+        category="wrong-attribute",
+        course="orbital",
+        query="Who discovered the coefficient?",
+        answerable=False,
+        expected_evidence=(),
+        forbidden_courses=("marine",),
+    )
+    conflict = SupportConflictCase(
+        "helios-pressure-conflict",
+        "orbital",
+        "What is the Helios pressure?",
+        ("The Helios pressure is 81 kPa.", "The Helios pressure is 93 kPa."),
+        SupportStatus.CONFLICTING,
+    )
+    responses = {
+        "answerable": FinalResponse(
+            FinalStatus.ANSWERED,
+            "A supported answer.",
+            (Citation("chunk-a", "alpha.md", "section", 1, 1),),
+            None,
+        ),
+        "unsupported": FinalResponse(
+            FinalStatus.ABSTAINED,
+            None,
+            (),
+            "missing_attribute",
+        ),
+    }
+    conflict_responses = {
+        conflict.label: FinalResponse(
+            FinalStatus.ABSTAINED,
+            None,
+            (),
+            "incompatible_facts",
+        )
+    }
+
+    metrics = summarize_generation_evaluation(
+        (answerable, unsupported),
+        responses,
+        conflict_cases=(conflict,),
+        conflict_responses=conflict_responses,
+    )
+
+    assert metrics.answered_supported == 1
+    assert metrics.missed_supported == 0
+    assert metrics.unsupported_generated == 0
+    assert metrics.correctly_abstained_unsupported == 1
+    assert metrics.abstained_conflicts == 1
+    assert metrics.citation_validation_failures == 0
+    assert metrics.answer_success_rate == 1.0
+    assert metrics.unsupported_generation_rate == 0.0

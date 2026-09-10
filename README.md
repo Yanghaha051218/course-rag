@@ -8,14 +8,14 @@ abstain instead of filling gaps with a model's pretrained knowledge.
 
 ## Status
 
-**Early development — Milestone 3-A.**
+**Early development — Milestone 3-B.**
 
 The repository now implements local document ingestion, source-aware parsing,
 deterministic chunking, SQLite metadata persistence, embedding providers,
 Qdrant indexing, course-scoped vector retrieval, deterministic retrieval
-evaluation, the M2-B similarity-gate baseline, and evidence support
-verification. Answer generation, final citations, and question answering are
-not implemented yet.
+evaluation, the M2-B similarity-gate baseline, evidence support verification,
+and a backend grounded-generation service. No question-answering HTTP endpoint
+or chat UI exists yet.
 
 ## Grounding principle
 
@@ -43,7 +43,8 @@ instructions. Prompting alone is not considered an enforcement boundary. See
 - **Document formats:** PDF, PPTX, DOCX, Markdown, and text are ingestible.
 - **Embeddings:** deterministic offline and OpenAI providers behind one small
   interface.
-- **Generation:** planned; no generation provider or model call exists yet.
+- **Generation (implemented service):** an OpenAI Responses API provider accepts
+  only `SUPPORTED` evidence chunks and returns strict structured claims.
 - **Similarity-gate baseline (implemented):** a provider-bound M2-B threshold
   retained for comparison, not a prerequisite for support verification.
 - **Support verification (implemented):** a fail-closed verifier binds
@@ -52,7 +53,7 @@ instructions. Prompting alone is not considered an enforcement boundary. See
 The fuller component and data-flow design is in
 [docs/architecture.md](docs/architecture.md).
 
-## Implemented through Milestone 3-A
+## Implemented through Milestone 3-B
 
 - Course creation and course-owned document metadata.
 - PDF page, PPTX slide, DOCX paragraph, Markdown, and text parsing.
@@ -66,15 +67,17 @@ The fuller component and data-flow design is in
 - Provider-bound calibration artifacts and a top-1 retrieval abstention gate.
 - Support verification with `SUPPORTED`, `INSUFFICIENT`, and `CONFLICTING`
   outcomes; only verified chunk IDs may support `SUPPORTED`.
+- Grounded-generation service that emits only `ANSWERED` responses with
+  validated source citations, or explicit `ABSTAINED` responses.
+- Citation validation that rejects invented, foreign-course, and unapproved
+  chunk bindings before an answer is returned.
 - Developer-facing ingestion CLI.
 
 ## Planned features
 
-- Generation that receives only `SUPPORTED` verified chunks.
-- Answers with locatable citations into the source materials.
-- Explicit unsupported or insufficient-evidence responses.
-- Additional embedding providers and a future generation provider.
-- Question-answering and chat interfaces.
+- A question-answering HTTP endpoint and frontend flow for the grounded service.
+- Additional embedding and generation providers.
+- Chat interfaces.
 
 These are roadmap items, not claims about the current implementation.
 
@@ -260,8 +263,10 @@ Parsing, SQLite, and local Qdrant remain local. When the OpenAI embedding
 provider is selected, document chunk text and query text are sent to OpenAI for
 embedding. When the OpenAI support verifier is selected, the question and only
 the retrieved evidence text/provenance for the selected course are sent to
-OpenAI. The deterministic embedding provider stays local and exists only for
-reproducible development and testing.
+OpenAI. When the OpenAI generator is selected, it receives the question and
+only the specific chunks bound by a `SUPPORTED` verifier decision. The
+deterministic embedding provider stays local and exists only for reproducible
+development and testing.
 
 **Never commit real course materials to a public repository.** Only synthetic,
 original fixtures created specifically for testing belong in `examples/`.

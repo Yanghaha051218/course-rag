@@ -9,6 +9,7 @@ from qdrant_client import QdrantClient
 
 from course_rag_api.calibration import extract_score_features
 from course_rag_api.embeddings import EmbeddingProvider
+from course_rag_api.generation import FinalResponse, FinalStatus
 from course_rag_api.indexing import IndexingService
 from course_rag_api.ingestion import ingest_document
 from course_rag_api.models import RetrievedChunk, SourceType
@@ -140,6 +141,18 @@ class SupportVerificationMetrics:
     answerable_support_rate: float
     unsupported_false_support_rate: float
     conflict_detection_rate: float
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationEvaluationMetrics:
+    answered_supported: int
+    missed_supported: int
+    unsupported_generated: int
+    correctly_abstained_unsupported: int
+    abstained_conflicts: int
+    citation_validation_failures: int
+    answer_success_rate: float
+    unsupported_generation_rate: float
 
 
 def _nonempty_string(value: Any, field: str) -> str:
@@ -485,6 +498,48 @@ def summarize_support_verification(
         ),
         conflict_detection_rate=(
             correctly_detected_conflicts / conflict_count if conflict_count else 0.0
+        ),
+    )
+
+
+def summarize_generation_evaluation(
+    cases: Sequence[EvaluationCase],
+    responses: Mapping[str, FinalResponse],
+    *,
+    conflict_cases: Sequence[SupportConflictCase] = (),
+    conflict_responses: Mapping[str, FinalResponse] | None = None,
+) -> GenerationEvaluationMetrics:
+    if {case.label for case in cases} != set(responses):
+        raise ValueError("generation responses must cover each evaluation case exactly once")
+    conflict_responses = conflict_responses or {}
+    if {case.label for case in conflict_cases} != set(conflict_responses):
+        raise ValueError("generation responses must cover each conflict case exactly once")
+    answerable = [case for case in cases if case.answerable]
+    unsupported = [case for case in cases if not case.answerable]
+    answered_supported = sum(
+        responses[case.label].status is FinalStatus.ANSWERED for case in answerable
+    )
+    unsupported_generated = sum(
+        responses[case.label].status is FinalStatus.ANSWERED for case in unsupported
+    )
+    all_responses = (*responses.values(), *conflict_responses.values())
+    return GenerationEvaluationMetrics(
+        answered_supported=answered_supported,
+        missed_supported=len(answerable) - answered_supported,
+        unsupported_generated=unsupported_generated,
+        correctly_abstained_unsupported=len(unsupported) - unsupported_generated,
+        abstained_conflicts=sum(
+            conflict_responses[case.label].status is FinalStatus.ABSTAINED
+            for case in conflict_cases
+        ),
+        citation_validation_failures=sum(
+            response.reason == "citation_validation_failed" for response in all_responses
+        ),
+        answer_success_rate=(
+            answered_supported / len(answerable) if answerable else 0.0
+        ),
+        unsupported_generation_rate=(
+            unsupported_generated / len(unsupported) if unsupported else 0.0
         ),
     )
 

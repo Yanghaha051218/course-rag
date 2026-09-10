@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     embedding_batch_size: int = Field(default=64, gt=0)
     verifier_provider: Literal["openai"] = "openai"
     verifier_model: str = Field(default="gpt-4o-mini", min_length=1)
+    generator_provider: Literal["openai"] = "openai"
+    generator_model: str = Field(default="gpt-4o-mini", min_length=1)
     chunk_target_size: int = Field(default=600, gt=0)
     chunk_overlap: int = Field(default=100, ge=0)
     max_document_bytes: int = Field(default=50 * 1024 * 1024, gt=0)

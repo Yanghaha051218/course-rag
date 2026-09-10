@@ -2,12 +2,12 @@
 
 ## Scope and status
 
-Milestone 3-A implements local document parsing and persistence, embedding,
+Milestone 3-B implements local document parsing and persistence, embedding,
 Qdrant indexing, course-scoped retrieval, offline retrieval evaluation, the
-M2-B similarity baseline, and support verification behind developer CLI
-commands. The FastAPI surface remains the Milestone 0 `/health` endpoint, and
-the Next.js page remains static. Components labelled **planned** do not exist
-yet.
+M2-B similarity baseline, support verification, and a backend grounded-answer
+service. The FastAPI surface remains the Milestone 0 `/health` endpoint, and
+the Next.js page remains static. The answer service is not exposed by HTTP or a
+CLI yet.
 
 ## Primary invariant
 
@@ -21,16 +21,16 @@ flowchart TD
     S --> R[Retrieve only course-scoped chunks]
     R --> V{Support verified?}
     V -- INSUFFICIENT or CONFLICTING --> A[Return explicit abstention]
-    V -- SUPPORTED --> L[Planned generator with verified evidence]
+    V -- SUPPORTED --> L[Generator with only verified evidence]
     L --> C[Validate claims and citations]
     C --> O[Return grounded answer with citations]
 ```
 
-The non-supported branch ends before any future generation-provider invocation.
+The non-supported branch ends before any generation-provider invocation.
 A prompt asking a model to abstain is a useful secondary control, but it cannot
 replace this backend branch.
 
-The implemented path stops at structured retrieval results:
+The implemented path ends in an internal `FinalResponse`:
 
 ```mermaid
 flowchart TD
@@ -45,7 +45,9 @@ flowchart TD
     O --> M[Offline retrieval measurements]
     O --> B[M2-B similarity-gate baseline]
     O --> V[Support Verifier]
-    V --> F[Future generator on SUPPORTED only]
+    V --> F[Generator on verified SUPPORTED chunks only]
+    F --> C[Citation validator]
+    C --> Z[ANSWERED or ABSTAINED FinalResponse]
     V --> A[INSUFFICIENT or CONFLICTING]
 ```
 
@@ -106,8 +108,12 @@ The implemented `EmbeddingProvider` interface exposes provider/model identity,
 dimension, batch document embedding, and query embedding. The deterministic
 provider supports offline tests; OpenAI is the external embedding option.
 
-Generation providers remain planned. Credentials come from environment
-variables and are never stored in vectors, logs, fixtures, or Git.
+`Generator` is a small provider contract returning a structured answer and
+claim-to-chunk bindings. The OpenAI provider uses the Responses API with strict
+JSON Schema, `store=false`, and no tools. It receives only the question plus
+the evidence chunks selected by a validated `SUPPORTED` decision. Credentials
+come from environment variables and are never stored in vectors, logs,
+fixtures, or Git.
 
 ### Retrieval evaluation
 
@@ -117,7 +123,7 @@ Hit@k, Recall@k, raw scores, and course-isolation status. It makes no evidence
 sufficiency decision. The checked-in corpus and labels are synthetic and
 human-readable; optional JSON output belongs under ignored runtime storage.
 
-### Similarity baseline, support verifier (implemented), and citation validator (planned)
+### Similarity baseline, support verifier, and grounded generation
 
 The M2-B Evidence Gate remains an evaluated provider-bound top-1 similarity
 baseline. Its strict threshold gave zero answerable holdout coverage on the
@@ -130,9 +136,13 @@ chunk IDs against the retrieved set and SQLite provenance before preserving a
 decision. It neither generates an answer nor decides factual truth beyond
 whether the supplied evidence can support answering the question.
 
-After future generation, a citation validator will reject or downgrade unsupported
-claims, verify that cited chunk IDs were in the approved evidence set, and
-return locators suitable for the source format.
+`AnswerGenerationService` calls a generator only after support verification is
+`SUPPORTED`. It passes only the verifier-bound chunks, never every retrieved
+candidate. Its `FinalResponse` is either `ANSWERED` with validated citations or
+`ABSTAINED` with a machine-readable reason. Raw model output never leaves this
+boundary. Citation validation rejects claims with invented or unapproved chunk
+IDs, duplicate or foreign evidence, and source locators outside the selected
+course. See [generation.md](generation.md).
 
 ## Grounding layers
 
@@ -142,8 +152,10 @@ return locators suitable for the source format.
    on the current holdout.** It remains available for comparison.
 3. **Evidence Support Verifier — implemented.** It fails closed unless a
    structured decision binds valid retrieved evidence.
-4. **Answer generator constrained to verified evidence — not implemented.**
-5. **Claim/citation validation — not implemented.**
+4. **Answer generator constrained to verified evidence — implemented.** Only
+   verifier-bound `SUPPORTED` chunks are included in the provider request.
+5. **Claim/citation validation — implemented.** Invalid bindings downgrade the
+   response to an abstention.
 
 ## Course isolation
 
@@ -156,7 +168,8 @@ Current and future defenses are layered:
 4. automated tests prove two courses remain distinct;
 5. Qdrant retrieval applies an exact `course_id` filter before returning hits;
 6. backend retrieval verifies Qdrant provenance against SQLite; and
-7. future answer orchestration must reject mismatched evidence before prompting.
+7. generation orchestration rejects mismatched evidence before prompting; and
+8. citation validation rejects foreign or unapproved chunk bindings afterward.
 
 Documents or chunks from Course A must never appear in retrieval, prompts,
 answers, or citations for Course B.
@@ -172,13 +185,12 @@ answers, or citations for Course B.
 - Errors must be explicit and observable; failed parsing, retrieval, or provider
   calls must not be converted into fabricated answers.
 
-## Intended request outcome types
+## Grounded service outcome types
 
-The future answer API should return a stable discriminated outcome:
+The grounded service returns a stable discriminated outcome:
 
-- `answered`: grounded answer plus validated citations;
-- `insufficient_evidence`: explicit abstention without a generation call; or
-- `error`: an operational failure, distinct from lack of evidence.
+- `ANSWERED`: grounded answer plus validated citations;
+- `ABSTAINED`: explicit abstention without a generation call when evidence is
+  insufficient or conflicting, or after a generator/citation validation failure.
 
-The precise endpoint and schema will be designed in the milestone that
-implements the answer path.
+The precise HTTP endpoint and wire schema remain a later milestone.

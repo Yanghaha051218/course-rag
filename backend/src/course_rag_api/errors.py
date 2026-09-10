@@ -48,3 +48,7 @@ class CalibrationMismatchError(CourseRAGError):
 
 class SupportVerificationError(CourseRAGError):
     pass
+
+
+class GenerationError(CourseRAGError):
+    pass

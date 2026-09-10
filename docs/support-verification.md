@@ -31,7 +31,8 @@ provider/model identity, and `supporting_chunk_ids`.
 - Every returned ID is checked to exist in the retrieved set, belong to the
   selected course, and match SQLite document/chunk provenance.
 - Empty evidence, foreign evidence, malformed output, invented IDs, and verifier
-  exceptions become non-supported decisions. No generator exists or is called.
+  exceptions become non-supported decisions. The grounded generator is never
+  called for these decisions.
 
 The verifier receives no expected answers, unrelated course materials, web
 search, File Search, or external tools. Evidence text is untrusted data and is
@@ -80,6 +81,6 @@ factual answer.
 ## Limitations
 
 Structured output and backend validation make the boundary safer, but a mocked
-test double does not establish semantic quality. Before M3-B, evaluate a live
-provider on a preregistered synthetic calibration/holdout protocol and report
-support, false-support, and conflict-detection metrics separately.
+test double does not establish semantic quality. Before production use, evaluate
+a live provider on a preregistered synthetic calibration/holdout protocol and
+report support, false-support, and conflict-detection metrics separately.

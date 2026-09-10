@@ -2,7 +2,7 @@
 
 Milestone 1-B converts SQLite chunks into vectors and returns ranked source
 chunks for one required course. Retrieval itself stops before support
-verification or generation; M3-A consumes its `RetrievedChunk[]` output.
+verification or generation; M3-A and M3-B consume its `RetrievedChunk[]` output.
 
 ```text
 SQLite chunks -> EmbeddingProvider -> Qdrant
@@ -90,7 +90,7 @@ M3-A does not require that strict threshold before Support Verification.
   embedding provider.
 - Support Verification is an architecture and safety boundary, not a demonstrated
   semantic-quality result until a live verifier is evaluated separately.
-- No answer generation, final citation formatting, or chat UI.
+- No answer-generation HTTP endpoint, final citation rendering, or chat UI.
 
 ## Official API references
 
