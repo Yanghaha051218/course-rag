@@ -1,7 +1,8 @@
 # Retrieval evaluation
 
-Milestone 2-A measures the existing course-scoped retriever before any evidence
-gate is designed. The checked-in dataset is
+Milestone 2-A established the retrieval measurement harness. M2-B expands the
+checked-in dataset and uses an explicit calibration/holdout split before adding
+the Evidence Gate. The dataset is
 [`examples/retrieval-evaluation/dataset.json`](../examples/retrieval-evaluation/dataset.json).
 It uses only original fictional materials and fixed chunk settings so every
 expected evidence reference is reviewable as a filename, chunk index, and source
@@ -11,7 +12,8 @@ range.
 
 The dataset measures whether labeled relevant chunks appear in the ranked
 results and whether every returned chunk belongs to the selected course. It
-contains exact, paraphrase, cross-document, multi-chunk, unsupported, near-miss,
+contains exact, paraphrase, cross-document, multi-chunk, unsupported,
+plausible-domain, near-miss, wrong-attribute, adversarial lexical-overlap,
 contradictory-course, and vocabulary-overlap cases.
 
 For answerable cases:
@@ -46,10 +48,9 @@ query distribution, and competing chunks. Retrieval quality asks whether the
 right evidence was ranked; evidence sufficiency asks whether that evidence can
 support the requested factual claim. Those are separate decisions.
 
-Evidence-threshold selection is deliberately deferred to M2-B. M2-B should use
-the observed answerable and unsupported score distributions, expand the dataset
-where needed, and choose calibration and abstention policy explicitly. M2-A
-does not provide a threshold or sufficiency decision.
+The M2-B calibration command chooses a provider-bound baseline threshold from
+the calibration split and reports holdout results separately. See
+[evidence gating](evidence-gating.md) for the objective and limitations.
 
 ## Run it
 

@@ -4,9 +4,9 @@
 
 This policy defines what CourseRAG may treat as evidence and how it must behave
 when answering questions about a selected course. It is normative for future
-retrieval and answer-generation work. Milestone 2-A measures raw, course-scoped
-candidate evidence with provenance, but does not yet decide evidence sufficiency
-or generate answers.
+retrieval and answer-generation work. Milestone 2-B adds a calibrated,
+provider-bound Evidence Gate for raw course-scoped evidence, but does not
+generate answers.
 
 ## Three distinct concepts
 
@@ -60,6 +60,15 @@ unsupported factual source.
 
 Strict grounding will be enforced in both of these ways:
 
+1. **Course-scoped vector retrieval (implemented):** Qdrant filters the selected
+   course and SQLite validates provenance.
+2. **Calibrated Evidence Gate (implemented):** a provider-bound retrieval policy
+   permits or abstains without generating an answer.
+3. **Generator instructions (planned):** a future generator will receive only
+   approved evidence.
+4. **Citation/support validation (planned):** generated claims will be checked
+   against approved evidence.
+
 ### A. Procedurally in backend code
 
 Backend orchestration will require a selected course, retrieve with a
@@ -85,8 +94,9 @@ deterministic backend code.
 
 ## Evidence-sufficiency policy
 
-The concrete scoring and thresholds will be specified in Milestone 2-B after
-retrieval evaluation. Whatever method is chosen must be deterministic at the
+The first top-1 retrieval policy is calibrated from an explicit synthetic split.
+Its threshold is provider-specific and is not factual confidence. Whatever
+future method is chosen must be deterministic at the
 orchestration boundary, testable without a live model, and conservative under
 ambiguity.
 

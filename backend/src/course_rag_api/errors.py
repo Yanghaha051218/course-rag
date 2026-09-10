@@ -40,3 +40,7 @@ class IndexCompatibilityError(CourseRAGError):
 
 class IndexConsistencyError(CourseRAGError):
     pass
+
+
+class CalibrationMismatchError(CourseRAGError):
+    pass

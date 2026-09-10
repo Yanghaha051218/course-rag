@@ -8,14 +8,13 @@ abstain instead of filling gaps with a model's pretrained knowledge.
 
 ## Status
 
-**Early development — Milestone 2-A.**
+**Early development — Milestone 2-B.**
 
 The repository now implements local document ingestion, source-aware parsing,
 deterministic chunking, SQLite metadata persistence, embedding providers,
-Qdrant indexing, course-scoped vector retrieval, a deterministic retrieval
-evaluation harness, a developer CLI, tests, synthetic fixtures, and CI. Evidence
-gating, answer generation, final citations, and question answering are not
-implemented yet.
+Qdrant indexing, course-scoped vector retrieval, deterministic retrieval
+evaluation, and a calibrated Evidence Gate that returns allow or abstain. Answer
+generation, final citations, and question answering are not implemented yet.
 
 ## Grounding principle
 
@@ -44,13 +43,13 @@ instructions. Prompting alone is not considered an enforcement boundary. See
 - **Embeddings:** deterministic offline and OpenAI providers behind one small
   interface.
 - **Generation:** planned; no generation provider or model call exists yet.
-- **Quality gates (planned):** retrieval sufficiency, course-isolation checks, citation
-  validation, and explicit abstention.
+- **Evidence gate (implemented):** provider-bound retrieval sufficiency and
+  explicit abstention; citation validation is planned.
 
 The fuller component and data-flow design is in
 [docs/architecture.md](docs/architecture.md).
 
-## Implemented through Milestone 2-A
+## Implemented through Milestone 2-B
 
 - Course creation and course-owned document metadata.
 - PDF page, PPTX slide, DOCX paragraph, Markdown, and text parsing.
@@ -61,6 +60,7 @@ The fuller component and data-flow design is in
 - Required-course retrieval returning ranked, provenance-preserving chunks.
 - Offline retrieval evaluation with Hit@k, Recall@k, raw-score collection, and
   explicit cross-course isolation checks.
+- Provider-bound calibration artifacts and a top-1 retrieval abstention gate.
 - Developer-facing ingestion CLI.
 
 ## Planned features
@@ -198,6 +198,24 @@ course-rag evaluate-retrieval \
 The report measures retrieval ranking and course isolation; it does not choose
 an evidence threshold or make a sufficiency decision. See
 [docs/retrieval-evaluation.md](docs/retrieval-evaluation.md).
+
+## Calibrate and inspect evidence
+
+```bash
+course-rag calibrate-retrieval \
+  examples/retrieval-evaluation/dataset.json \
+  --output runtime/evaluations/m2b-calibration.json
+
+course-rag inspect-evidence \
+  --course <course-id> \
+  --query "What is the Blueleaf coefficient?" \
+  --calibration runtime/evaluations/m2b-calibration.json
+```
+
+Calibration measures a synthetic corpus and binds a threshold to one embedding
+provider/model/dimension. The gate preserves retrieved provenance on `ALLOW` and
+returns `ABSTAIN` otherwise; it never generates a natural-language answer. See
+[docs/evidence-gating.md](docs/evidence-gating.md).
 
 ## Verification commands
 

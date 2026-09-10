@@ -2,6 +2,11 @@ from pathlib import Path
 
 import pytest
 
+from course_rag_api.calibration import (
+    CalibrationIdentity,
+    LabeledScore,
+    calibrate_threshold,
+)
 from course_rag_api.cli import main
 from course_rag_api.config import get_settings
 from course_rag_api.storage import SQLiteStore
@@ -127,10 +132,101 @@ def test_cli_evaluates_retrieval_and_writes_json(
     )
     output = capsys.readouterr().out
 
-    assert "Cases: 8 (answerable=6, unsupported=2)" in output
+    assert "Cases: 40 (answerable=20, unsupported=20)" in output
     assert "Hit@1:" in output
     assert "Hit@3:" in output
     assert "Hit@5:" in output
     assert "Isolation: PASS" in output
-    assert '"case_count": 8' in output_path.read_text()
+    assert '"case_count": 40' in output_path.read_text()
+    get_settings.cache_clear()
+
+
+def test_cli_calibrates_retrieval_with_separate_holdout_metrics(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_path = tmp_path / "calibration.json"
+    monkeypatch.setenv("COURSE_RAG_EMBEDDING_PROVIDER", "deterministic")
+    get_settings.cache_clear()
+
+    assert (
+        main(
+            [
+                "calibrate-retrieval",
+                str(EVALUATION_DATASET),
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+
+    assert "Selected policy: top1_threshold" in output
+    assert "CALIBRATION" in output
+    assert "HOLDOUT" in output
+    assert "Unsupported false-accept:" in output
+    assert '"dataset_version": "m2b-v1"' in output_path.read_text()
+    get_settings.cache_clear()
+
+
+def test_cli_inspects_evidence_without_generating_an_answer(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database = tmp_path / "metadata.sqlite3"
+    calibration_path = tmp_path / "calibration.json"
+    monkeypatch.setenv("COURSE_RAG_QDRANT_PATH", str(tmp_path / "qdrant"))
+    monkeypatch.setenv("COURSE_RAG_EMBEDDING_PROVIDER", "deterministic")
+    get_settings.cache_clear()
+    calibration_path.write_text(
+        calibrate_threshold(
+            (
+                LabeledScore("answer", True, 0.2, 0.2),
+                LabeledScore("unsupported", False, 0.1, 0.1),
+            ),
+            CalibrationIdentity(
+                "deterministic",
+                "deterministic-hash-v1",
+                256,
+                "test-v1",
+                5,
+                32,
+                4,
+            ),
+        ).to_json()
+    )
+    main(["--database", str(database), "create-course", "Evidence Demo"])
+    course_id = capsys.readouterr().out.split("Course ID: ", 1)[1].strip()
+    path = tmp_path / "lesson.txt"
+    path.write_text("The fictional valve opens after twelve measured minutes.")
+    main(["--database", str(database), "ingest", "--course", course_id, str(path)])
+    capsys.readouterr()
+    main(["--database", str(database), "index-course", "--course", course_id])
+    capsys.readouterr()
+
+    assert (
+        main(
+            [
+                "--database",
+                str(database),
+                "inspect-evidence",
+                "--course",
+                course_id,
+                "--query",
+                "When does the fictional valve open?",
+                "--calibration",
+                str(calibration_path),
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+
+    assert "Decision: ALLOW" in output
+    assert "Evidence:" in output
+    assert "lesson.txt" in output
+    assert "answer" not in output.casefold()
     get_settings.cache_clear()

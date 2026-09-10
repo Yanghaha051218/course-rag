@@ -72,7 +72,9 @@ Query text is embedded in memory and is not written to SQLite or Qdrant.
 
 Results are ordered by Qdrant similarity score descending, then chunk ID for
 stable tie ordering. The score is returned unchanged as a vector similarity
-score. It is not a factual-confidence percentage.
+score. It is not a factual-confidence percentage. The separate Evidence Gate
+uses a provider-bound calibration artifact; raw scores are never globally
+portable.
 
 ## Current limitations
 
@@ -82,9 +84,10 @@ score. It is not a factual-confidence percentage.
 - Course indexing currently loads one course's chunk metadata at once; add
   pagination only when measured course sizes require it.
 - This milestone configures embedded local Qdrant only, not a remote cluster.
-- No evidence threshold is applied; threshold calibration belongs to Milestone
-  2-B.
-- No evidence gate, answer generation, final citation formatting, or chat UI.
+- The M2-B gate is calibrated only on the synthetic corpus and deterministic
+  provider; production calibration requires representative data and the chosen
+  embedding provider.
+- No answer generation, final citation formatting, or chat UI.
 
 ## Official API references
 

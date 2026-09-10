@@ -2,11 +2,11 @@
 
 ## Scope and status
 
-Milestone 2-A implements local document parsing and persistence, embedding,
-Qdrant indexing, course-scoped retrieval, and an offline retrieval-evaluation
-harness behind a developer CLI. The FastAPI surface remains the Milestone 0
-`/health` endpoint, and the Next.js page remains static. Components labelled
-**planned** do not exist yet.
+Milestone 2-B implements local document parsing and persistence, embedding,
+Qdrant indexing, course-scoped retrieval, offline retrieval evaluation, and a
+provider-bound Evidence Gate behind a developer CLI. The FastAPI surface
+remains the Milestone 0 `/health` endpoint, and the Next.js page remains
+static. Components labelled **planned** do not exist yet.
 
 ## Primary invariant
 
@@ -41,7 +41,9 @@ flowchart TD
     V --> R[Course-filtered Retriever]
     R --> O[RetrievedChunk array]
     O --> M[Offline retrieval measurements]
-    O --> F[Future evidence gate and generator]
+    O --> G[Calibrated Evidence Gate]
+    G --> F[Future generator on ALLOW only]
+    G --> A[Explicit abstain]
 ```
 
 ## Major components
@@ -50,7 +52,7 @@ flowchart TD
 
 The Next.js frontend will present course selection, document-management status,
 questions, answers, citations, and abstention states. It will communicate with
-the backend through typed HTTP contracts. It remains static in Milestone 2-A.
+the backend through typed HTTP contracts. It remains static in Milestone 2-B.
 
 ### API and orchestration
 
@@ -112,14 +114,15 @@ Hit@k, Recall@k, raw scores, and course-isolation status. It makes no evidence
 sufficiency decision. The checked-in corpus and labels are synthetic and
 human-readable; optional JSON output belongs under ignored runtime storage.
 
-### Evidence gate and citation validator (planned)
+### Evidence gate (implemented) and citation validator (planned)
 
-The evidence gate will decide whether retrieved passages are adequate for the
-question using explicit, testable rules. The exact scoring policy belongs to a
-later milestone. Its contract must produce a structured sufficient/insufficient
-decision and explanatory reason.
+The Evidence Gate verifies provider identity against an empirical calibration
+artifact, rejects empty or foreign-course results, and applies a calibrated
+top-1 similarity policy. It returns a structured allow/abstain decision and
+preserves `RetrievedChunk` provenance only for allow. It neither generates an
+answer nor decides factual truth; calibration labels remain evaluation-only.
 
-After generation, a citation validator will reject or downgrade unsupported
+After future generation, a citation validator will reject or downgrade unsupported
 claims, verify that cited chunk IDs were in the approved evidence set, and
 return locators suitable for the source format.
 

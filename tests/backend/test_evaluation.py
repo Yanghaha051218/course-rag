@@ -43,6 +43,7 @@ def test_dataset_validation_rejects_answerable_case_without_expected_evidence(
     path.write_text(
         json.dumps(
             {
+                "version": "test-v1",
                 "chunk_target_size": 40,
                 "chunk_overlap": 5,
                 "courses": [
@@ -57,6 +58,7 @@ def test_dataset_validation_rejects_answerable_case_without_expected_evidence(
                         "answerable": True,
                         "expected_evidence": [],
                         "forbidden_courses": [],
+                        "split": "calibration",
                     }
                 ],
             }
@@ -171,6 +173,16 @@ def test_synthetic_dataset_runs_offline_and_never_returns_forbidden_course() -> 
     )
 
     assert first.to_json() == second.to_json()
+    assert dataset.version == "m2b-v1"
+    assert len(dataset.cases) == 40
+    calibration_labels = {
+        case.label for case in dataset.cases if case.split == "calibration"
+    }
+    holdout_labels = {case.label for case in dataset.cases if case.split == "holdout"}
+    assert len(calibration_labels) == 28
+    assert len(holdout_labels) == 12
+    assert calibration_labels.isdisjoint(holdout_labels)
+    assert all(case.answerable == bool(case.expected_evidence) for case in dataset.cases)
     assert first.case_count == len(dataset.cases)
     assert first.answerable_count > 0
     assert first.unsupported_count > 0
@@ -185,7 +197,10 @@ def test_synthetic_dataset_runs_offline_and_never_returns_forbidden_course() -> 
         "paraphrase",
         "same-course cross-document",
         "multi-chunk",
-        "unsupported query",
+        "unsupported unrelated",
+        "unsupported plausible domain",
+        "wrong-attribute",
+        "adversarial lexical overlap",
         "near-miss",
         "contradictory-course isolation",
         "vocabulary-overlap isolation",

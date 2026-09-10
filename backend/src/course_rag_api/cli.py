@@ -5,8 +5,18 @@ from typing import Sequence
 
 from qdrant_client import QdrantClient
 
+from course_rag_api.calibration import (
+    CalibrationIdentity,
+    CalibrationResult,
+    LabeledScore,
+    calibrate_margin_threshold,
+    calibrate_threshold,
+    evaluate_policy,
+    summarize_distribution,
+)
 from course_rag_api.config import get_settings
 from course_rag_api.embeddings import create_embedding_provider
+from course_rag_api.evidence import EvidenceGate
 from course_rag_api.errors import CourseRAGError
 from course_rag_api.evaluation import (
     format_evaluation_report,
@@ -43,6 +53,15 @@ def _parser() -> argparse.ArgumentParser:
     evaluate.add_argument("dataset", type=Path)
     evaluate.add_argument("--limit", type=int, default=5)
     evaluate.add_argument("--output", type=Path)
+    calibrate = commands.add_parser("calibrate-retrieval")
+    calibrate.add_argument("dataset", type=Path)
+    calibrate.add_argument("--limit", type=int, default=5)
+    calibrate.add_argument("--output", type=Path)
+    inspect = commands.add_parser("inspect-evidence")
+    inspect.add_argument("--course", required=True)
+    inspect.add_argument("--query", required=True)
+    inspect.add_argument("--calibration", required=True, type=Path)
+    inspect.add_argument("--limit", type=int, default=5)
     return parser
 
 
@@ -55,21 +74,131 @@ def _print_index_summary(summary: IndexingSummary) -> None:
     print(f"Indexed now: {summary.indexed_count}")
 
 
+def _labeled_scores(report, split: str) -> tuple[LabeledScore, ...]:
+    return tuple(
+        LabeledScore(
+            case.label,
+            case.answerable,
+            case.top_1_score,
+            case.top_1_top_2_margin,
+        )
+        for case in report.cases
+        if case.split == split
+    )
+
+
+def _print_metrics(label: str, metrics) -> None:
+    print(label)
+    print(f"  Answerable allow: {metrics.answerable_allow}")
+    print(f"  Answerable abstain: {metrics.answerable_abstain}")
+    print(f"  Unsupported allow: {metrics.unsupported_allow}")
+    print(f"  Unsupported abstain: {metrics.unsupported_abstain}")
+    print(f"  Answerable acceptance: {metrics.answerable_acceptance_rate:.3f}")
+    print(f"  Unsupported false-accept: {metrics.unsupported_false_accept_rate:.3f}")
+    print(f"  Abstention: {metrics.abstention_rate:.3f}")
+
+
+def _print_distribution(label: str, values: list[float]) -> None:
+    summary = summarize_distribution(values)
+    print(
+        f"{label}: count={summary.count} min={summary.minimum!s} "
+        f"max={summary.maximum!s} mean={summary.mean!s} median={summary.median!s} "
+        f"p10={summary.p10!s} p25={summary.p25!s} "
+        f"p75={summary.p75!s} p90={summary.p90!s}"
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     settings = get_settings()
-    if args.command == "evaluate-retrieval":
+    if args.command in {"evaluate-retrieval", "calibrate-retrieval"}:
         try:
-            report = run_retrieval_evaluation(
-                load_evaluation_dataset(args.dataset),
-                create_embedding_provider(settings),
-                limit=args.limit,
+            dataset = load_evaluation_dataset(args.dataset)
+            provider = create_embedding_provider(settings)
+            report = run_retrieval_evaluation(dataset, provider, limit=args.limit)
+            if args.command == "evaluate-retrieval":
+                print(format_evaluation_report(report))
+                if args.output is not None:
+                    args.output.parent.mkdir(parents=True, exist_ok=True)
+                    args.output.write_text(report.to_json(), encoding="utf-8")
+                    print(f"JSON: {args.output}")
+                return 0
+
+            identity = CalibrationIdentity(
+                provider.provider_name,
+                provider.model_name,
+                provider.dimension,
+                dataset.version,
+                args.limit,
+                dataset.chunk_target_size,
+                dataset.chunk_overlap,
             )
-            print(format_evaluation_report(report))
+            calibration_cases = _labeled_scores(report, "calibration")
+            holdout_cases = _labeled_scores(report, "holdout")
+            calibration = calibrate_threshold(calibration_cases, identity)
+            holdout_metrics = evaluate_policy(
+                holdout_cases, threshold=calibration.threshold
+            )
+            margin = calibrate_margin_threshold(
+                calibration_cases, threshold=calibration.threshold
+            )
+            print(f"Provider: {provider.provider_name}")
+            print(f"Model: {provider.model_name}")
+            print(f"Dimension: {provider.dimension}")
+            print(f"Dataset version: {dataset.version}")
+            print(f"Selected policy: {calibration.policy_type}")
+            print(f"Selected threshold: {calibration.threshold:.6f}")
+            _print_metrics("CALIBRATION", calibration.calibration_metrics)
+            _print_metrics("HOLDOUT", holdout_metrics)
+            _print_distribution(
+                "Answerable top-1",
+                [
+                    case.top_1_score
+                    for case in report.cases
+                    if case.answerable and case.top_1_score is not None
+                ],
+            )
+            _print_distribution(
+                "Unsupported top-1",
+                [
+                    case.top_1_score
+                    for case in report.cases
+                    if not case.answerable and case.top_1_score is not None
+                ],
+            )
+            _print_distribution(
+                "Answerable margin",
+                [
+                    case.top_1_top_2_margin
+                    for case in report.cases
+                    if case.answerable and case.top_1_top_2_margin is not None
+                ],
+            )
+            _print_distribution(
+                "Unsupported margin",
+                [
+                    case.top_1_top_2_margin
+                    for case in report.cases
+                    if not case.answerable and case.top_1_top_2_margin is not None
+                ],
+            )
+            if margin.metrics is None:
+                print("Margin comparison: unavailable after top-1 threshold")
+            else:
+                holdout_margin = evaluate_policy(
+                    holdout_cases,
+                    threshold=calibration.threshold,
+                    margin_threshold=margin.margin_threshold,
+                )
+                print(
+                    "Margin comparison: baseline remains selected; "
+                    f"candidate margin={margin.margin_threshold:.6f}"
+                )
+                _print_metrics("HOLDOUT margin candidate", holdout_margin)
             if args.output is not None:
                 args.output.parent.mkdir(parents=True, exist_ok=True)
-                args.output.write_text(report.to_json(), encoding="utf-8")
-                print(f"JSON: {args.output}")
+                args.output.write_text(calibration.to_json(), encoding="utf-8")
+                print(f"Calibration JSON: {args.output}")
             return 0
         except (CourseRAGError, OSError, ValueError) as error:
             print(f"Error: {error}", file=sys.stderr)
@@ -124,6 +253,36 @@ def main(argv: Sequence[str] | None = None) -> int:
                         batch_size=settings.embedding_batch_size,
                     ).index_course(args.course)
                 )
+                return 0
+            if args.command == "inspect-evidence":
+                calibration = CalibrationResult.from_json(args.calibration)
+                if calibration.identity.retrieval_limit != args.limit:
+                    raise ValueError(
+                        "calibration retrieval_limit does not match "
+                        "inspect-evidence limit"
+                    )
+                results = Retriever(store, index, provider).retrieve(
+                    course_id=args.course, query=args.query, limit=args.limit
+                )
+                decision = EvidenceGate(provider).evaluate(
+                    course_id=args.course,
+                    retrieved_chunks=results,
+                    calibration=calibration,
+                )
+                print(f"Decision: {decision.status.upper()}")
+                print(f"Reason: {decision.reason}")
+                print(f"Top score: {decision.top_score}")
+                print(f"Threshold: {decision.threshold:.6f}")
+                if decision.evidence:
+                    print("Evidence:")
+                    for chunk in decision.evidence:
+                        location = (
+                            f"{chunk.source_type} {chunk.source_start}"
+                            if chunk.source_start == chunk.source_end
+                            else f"{chunk.source_type} "
+                            f"{chunk.source_start}-{chunk.source_end}"
+                        )
+                        print(f"- {chunk.filename} {location} score={chunk.score:.6f}")
                 return 0
             results = Retriever(store, index, provider).retrieve(
                 course_id=args.course, query=args.query, limit=args.limit

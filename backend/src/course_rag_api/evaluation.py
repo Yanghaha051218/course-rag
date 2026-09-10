@@ -2,10 +2,11 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any
+from typing import Any, Literal
 
 from qdrant_client import QdrantClient
 
+from course_rag_api.calibration import extract_score_features
 from course_rag_api.embeddings import EmbeddingProvider
 from course_rag_api.indexing import IndexingService
 from course_rag_api.ingestion import ingest_document
@@ -58,10 +59,12 @@ class EvaluationCase:
     answerable: bool
     expected_evidence: tuple[EvidenceRef, ...]
     forbidden_courses: tuple[str, ...]
+    split: Literal["calibration", "holdout"] = "calibration"
 
 
 @dataclass(frozen=True, slots=True)
 class EvaluationDataset:
+    version: str
     chunk_target_size: int
     chunk_overlap: int
     courses: tuple[EvaluationCourse, ...]
@@ -85,8 +88,15 @@ class EvaluationCaseResult:
     label: str
     category: str
     course: str
+    course_id: str
+    split: Literal["calibration", "holdout"]
     answerable: bool
+    expected_evidence: tuple[EvidenceRef, ...]
     top_1_score: float | None
+    top_2_score: float | None
+    top_3_score: float | None
+    top_1_top_2_margin: float | None
+    retrieved_result_count: int
     scores: tuple[float, ...]
     hit_at: dict[int, bool]
     recall_at: dict[int, float | None]
@@ -135,6 +145,7 @@ def load_evaluation_dataset(path: Path) -> EvaluationDataset:
     if not isinstance(raw, dict):
         raise ValueError("evaluation dataset must be a JSON object")
 
+    version = _nonempty_string(raw.get("version"), "version")
     target_size = _positive_int(raw.get("chunk_target_size"), "chunk_target_size")
     overlap = raw.get("chunk_overlap")
     if (
@@ -245,13 +256,25 @@ def load_evaluation_dataset(path: Path) -> EvaluationDataset:
             value not in course_documents for value in forbidden
         ):
             raise ValueError(f"invalid forbidden course in case {label}")
+        split = item.get("split")
+        if split not in ("calibration", "holdout"):
+            raise ValueError(f"invalid split in case {label}")
         cases.append(
             EvaluationCase(
-                label, category, course, query, answerable, tuple(evidence), forbidden
+                label,
+                category,
+                course,
+                query,
+                answerable,
+                tuple(evidence),
+                forbidden,
+                split,
             )
         )
 
-    return EvaluationDataset(target_size, overlap, tuple(courses), tuple(cases))
+    return EvaluationDataset(
+        version, target_size, overlap, tuple(courses), tuple(cases)
+    )
 
 
 def score_case(
@@ -307,20 +330,28 @@ def score_case(
         )
         for k in _K_VALUES
     }
+    features = extract_score_features(chunks)
     return EvaluationCaseResult(
-        case.label,
-        case.category,
-        case.course,
-        case.answerable,
-        chunks[0].score if chunks else None,
-        tuple(chunk.score for chunk in chunks),
-        hit_at,
-        recall_at,
-        all(
+        label=case.label,
+        category=case.category,
+        course=case.course,
+        course_id=case.course,
+        split=case.split,
+        answerable=case.answerable,
+        expected_evidence=case.expected_evidence,
+        top_1_score=features.top1_score,
+        top_2_score=features.top2_score,
+        top_3_score=features.top3_score,
+        top_1_top_2_margin=features.top1_top2_margin,
+        retrieved_result_count=features.result_count,
+        scores=tuple(chunk.score for chunk in chunks),
+        hit_at=hit_at,
+        recall_at=recall_at,
+        isolation_passed=all(
             item.course == case.course and item.course not in case.forbidden_courses
             for item in retrieved
         ),
-        tuple(retrieved),
+        retrieved=tuple(retrieved),
     )
 
 

@@ -1,160 +1,650 @@
 {
-  "chunk_target_size": 32,
-  "chunk_overlap": 4,
-  "courses": [
-    {
-      "key": "orbital-gardening",
-      "name": "Orbital Gardening Evaluation",
-      "documents": [
-        "../example-course/materials/orbital-gardening.md",
-        "materials/orbital-water.md",
-        "materials/orbital-orchids.md",
-        "materials/eclipse-protocol.md"
-      ]
-    },
-    {
-      "key": "marine-gardening",
-      "name": "Marine Gardening Evaluation",
-      "documents": [
-        "../marine-gardening-course/materials/marine-gardening.md",
-        "materials/marine-tides.md"
-      ]
-    }
-  ],
-  "cases": [
-    {
-      "label": "orbital-blueleaf-coefficient",
-      "category": "exact-answer",
-      "course": "orbital-gardening",
-      "query": "What is the Orbital Blueleaf coefficient?",
-      "answerable": true,
-      "expected_evidence": [
+    "version": "m2b-v1",
+    "chunk_target_size": 32,
+    "chunk_overlap": 4,
+    "courses": [
         {
-          "filename": "orbital-gardening.md",
-          "chunk_index": 0,
-          "source_type": "section",
-          "source_start": 1,
-          "source_end": 2
-        }
-      ],
-      "forbidden_courses": ["marine-gardening"]
-    },
-    {
-      "label": "comet-moss-watering-paraphrase",
-      "category": "paraphrase",
-      "course": "orbital-gardening",
-      "query": "How often should gardeners give water to comet moss?",
-      "answerable": true,
-      "expected_evidence": [
-        {
-          "filename": "orbital-water.md",
-          "chunk_index": 0,
-          "source_type": "section",
-          "source_start": 1,
-          "source_end": 2
-        }
-      ],
-      "forbidden_courses": []
-    },
-    {
-      "label": "watering-and-orchid-alignment",
-      "category": "same-course cross-document",
-      "course": "orbital-gardening",
-      "query": "What are the comet moss watering interval and the night orchid heliostat rotation?",
-      "answerable": true,
-      "expected_evidence": [
-        {
-          "filename": "orbital-water.md",
-          "chunk_index": 0,
-          "source_type": "section",
-          "source_start": 1,
-          "source_end": 2
+            "key": "orbital-gardening",
+            "name": "Orbital Gardening Evaluation",
+            "documents": [
+                "../example-course/materials/orbital-gardening.md",
+                "materials/orbital-water.md",
+                "materials/orbital-orchids.md",
+                "materials/eclipse-protocol.md",
+                "materials/orbital-climate.md",
+                "materials/orbital-logistics.md"
+            ]
         },
         {
-          "filename": "orbital-orchids.md",
-          "chunk_index": 0,
-          "source_type": "section",
-          "source_start": 1,
-          "source_end": 2
+            "key": "marine-gardening",
+            "name": "Marine Gardening Evaluation",
+            "documents": [
+                "../marine-gardening-course/materials/marine-gardening.md",
+                "materials/marine-tides.md",
+                "materials/marine-climate.md",
+                "materials/marine-logistics.md"
+            ]
         }
-      ],
-      "forbidden_courses": []
-    },
-    {
-      "label": "eclipse-checkpoint-and-archive",
-      "category": "multi-chunk",
-      "course": "orbital-gardening",
-      "query": "Which eclipse checkpoint code and completion archive tag are recorded?",
-      "answerable": true,
-      "expected_evidence": [
+    ],
+    "cases": [
         {
-          "filename": "eclipse-protocol.md",
-          "chunk_index": 0,
-          "source_type": "section",
-          "source_start": 1,
-          "source_end": 3
+            "label": "orbital-blueleaf-coefficient",
+            "category": "exact-answer",
+            "split": "calibration",
+            "course": "orbital-gardening",
+            "query": "What is the Orbital Blueleaf coefficient?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "orbital-gardening.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": [
+                "marine-gardening"
+            ]
         },
         {
-          "filename": "eclipse-protocol.md",
-          "chunk_index": 1,
-          "source_type": "section",
-          "source_start": 3,
-          "source_end": 4
-        }
-      ],
-      "forbidden_courses": []
-    },
-    {
-      "label": "unsupported-orbital-temperature",
-      "category": "unsupported query",
-      "course": "orbital-gardening",
-      "query": "What temperature is the orbital greenhouse at midnight?",
-      "answerable": false,
-      "expected_evidence": [],
-      "forbidden_courses": []
-    },
-    {
-      "label": "blueleaf-fertilizer-near-miss",
-      "category": "near-miss",
-      "course": "orbital-gardening",
-      "query": "Which fertilizer is prescribed for Orbital Blueleaf seedlings?",
-      "answerable": false,
-      "expected_evidence": [],
-      "forbidden_courses": ["marine-gardening"]
-    },
-    {
-      "label": "contradictory-blueleaf-course",
-      "category": "contradictory-course isolation",
-      "course": "marine-gardening",
-      "query": "What is the Marine Blueleaf coefficient?",
-      "answerable": true,
-      "expected_evidence": [
+            "label": "orbital-solar-vines-hours",
+            "category": "exact-answer",
+            "split": "calibration",
+            "course": "orbital-gardening",
+            "query": "How many hours of ultraviolet exposure do orbital solar vines receive?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "orbital-gardening.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": [
+                "marine-gardening"
+            ]
+        },
         {
-          "filename": "marine-gardening.md",
-          "chunk_index": 0,
-          "source_type": "section",
-          "source_start": 1,
-          "source_end": 2
-        }
-      ],
-      "forbidden_courses": ["orbital-gardening"]
-    },
-    {
-      "label": "marine-ultraviolet-overlap",
-      "category": "vocabulary-overlap isolation",
-      "course": "marine-gardening",
-      "query": "How many hours of ultraviolet exposure do Marine solar vines receive?",
-      "answerable": true,
-      "expected_evidence": [
+            "label": "comet-moss-watering",
+            "category": "exact-answer",
+            "split": "calibration",
+            "course": "orbital-gardening",
+            "query": "Is comet moss watered every sixteen hours and marked CM-16?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "orbital-water.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": []
+        },
         {
-          "filename": "marine-gardening.md",
-          "chunk_index": 0,
-          "source_type": "section",
-          "source_start": 1,
-          "source_end": 2
+            "label": "tidal-moss-watering",
+            "category": "exact-answer",
+            "split": "calibration",
+            "course": "marine-gardening",
+            "query": "Is tidal moss watered every six hours and marked TM-06?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "marine-tides.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": []
+        },
+        {
+            "label": "marine-salinity-index",
+            "category": "exact-answer",
+            "split": "calibration",
+            "course": "marine-gardening",
+            "query": "Is the tidal greenhouse water salinity index eighteen?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "marine-climate.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": []
+        },
+        {
+            "label": "orbital-pressure-paraphrase",
+            "category": "paraphrase",
+            "split": "calibration",
+            "course": "orbital-gardening",
+            "query": "At what pressure is the orbital greenhouse maintained?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "orbital-climate.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": []
+        },
+        {
+            "label": "night-orchid-alignment-paraphrase",
+            "category": "paraphrase",
+            "split": "calibration",
+            "course": "orbital-gardening",
+            "query": "How far is the heliostat turned for night orchids?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "orbital-orchids.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": []
+        },
+        {
+            "label": "marine-capsule-color-paraphrase",
+            "category": "paraphrase",
+            "split": "calibration",
+            "course": "marine-gardening",
+            "query": "Which color covers the marine supply capsule?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "marine-logistics.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": []
+        },
+        {
+            "label": "orbital-watering-and-orchid-alignment",
+            "category": "same-course cross-document",
+            "split": "calibration",
+            "course": "orbital-gardening",
+            "query": "What are the comet moss watering interval and night orchid heliostat rotation?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "orbital-water.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                },
+                {
+                    "filename": "orbital-orchids.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": []
+        },
+        {
+            "label": "marine-pressure-and-bay",
+            "category": "same-course cross-document",
+            "split": "calibration",
+            "course": "marine-gardening",
+            "query": "What are the tidal greenhouse pressure and marine docking bay?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "marine-climate.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                },
+                {
+                    "filename": "marine-logistics.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": []
+        },
+        {
+            "label": "eclipse-checkpoint-and-archive",
+            "category": "multi-chunk",
+            "split": "calibration",
+            "course": "orbital-gardening",
+            "query": "Which eclipse checkpoint code and completion archive tag are recorded?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "eclipse-protocol.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 3
+                },
+                {
+                    "filename": "eclipse-protocol.md",
+                    "chunk_index": 1,
+                    "source_type": "section",
+                    "source_start": 3,
+                    "source_end": 4
+                }
+            ],
+            "forbidden_courses": []
+        },
+        {
+            "label": "contradictory-marine-blueleaf",
+            "category": "contradictory-course isolation",
+            "split": "calibration",
+            "course": "marine-gardening",
+            "query": "What is the Marine Blueleaf coefficient?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "marine-gardening.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": [
+                "orbital-gardening"
+            ]
+        },
+        {
+            "label": "marine-ultraviolet-overlap",
+            "category": "vocabulary-overlap isolation",
+            "split": "calibration",
+            "course": "marine-gardening",
+            "query": "How many hours of ultraviolet exposure do Marine solar vines receive?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "marine-gardening.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": [
+                "orbital-gardening"
+            ]
+        },
+        {
+            "label": "orbital-docking-bay",
+            "category": "exact-answer",
+            "split": "calibration",
+            "course": "orbital-gardening",
+            "query": "Do supplies arrive through orbital docking bay O-7?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "orbital-logistics.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": [
+                "marine-gardening"
+            ]
+        },
+        {
+            "label": "unsupported-orbital-moon-author",
+            "category": "unsupported unrelated",
+            "split": "calibration",
+            "course": "orbital-gardening",
+            "query": "Who wrote the history of the station moons?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": []
+        },
+        {
+            "label": "unsupported-marine-currency",
+            "category": "unsupported unrelated",
+            "split": "calibration",
+            "course": "marine-gardening",
+            "query": "Which currency is used at the tidal market?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": []
+        },
+        {
+            "label": "orbital-algae-wavelength",
+            "category": "unsupported plausible domain",
+            "split": "calibration",
+            "course": "orbital-gardening",
+            "query": "What wavelength maximizes orbital algae photosynthesis?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": []
+        },
+        {
+            "label": "marine-coral-ph",
+            "category": "unsupported plausible domain",
+            "split": "calibration",
+            "course": "marine-gardening",
+            "query": "What pH is required for coral seedlings in the tidal greenhouse?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": []
+        },
+        {
+            "label": "blueleaf-discoverer",
+            "category": "near-miss",
+            "split": "calibration",
+            "course": "orbital-gardening",
+            "query": "Which scientist discovered the Blueleaf coefficient used for orbital root stability?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": [
+                "marine-gardening"
+            ]
+        },
+        {
+            "label": "marine-blueleaf-inventor",
+            "category": "near-miss",
+            "split": "calibration",
+            "course": "marine-gardening",
+            "query": "Who invented the Marine Blueleaf coefficient?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": [
+                "orbital-gardening"
+            ]
+        },
+        {
+            "label": "orbital-greenhouse-construction-year",
+            "category": "wrong-attribute",
+            "split": "calibration",
+            "course": "orbital-gardening",
+            "query": "What year was the eighty-one kilopascal orbital greenhouse constructed?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": []
+        },
+        {
+            "label": "marine-tray-manufacturer",
+            "category": "wrong-attribute",
+            "split": "calibration",
+            "course": "marine-gardening",
+            "query": "Which company manufactured the TM-06 tidal moss tray?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": []
+        },
+        {
+            "label": "solar-vine-wavelength",
+            "category": "adversarial lexical overlap",
+            "split": "calibration",
+            "course": "orbital-gardening",
+            "query": "What exact ultraviolet wavelength is used for orbital solar vines before artificial dusk?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": [
+                "marine-gardening"
+            ]
+        },
+        {
+            "label": "comet-moss-tray-color",
+            "category": "adversarial lexical overlap",
+            "split": "calibration",
+            "course": "orbital-gardening",
+            "query": "What color is the comet moss tray marked CM-16 and watered every sixteen hours?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": []
+        },
+        {
+            "label": "eclipse-protocol-author",
+            "category": "adversarial lexical overlap",
+            "split": "calibration",
+            "course": "orbital-gardening",
+            "query": "Who authored the eclipse harvest protocol with LUMEN-14 and ORBIT-FIN?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": []
+        },
+        {
+            "label": "marine-tides-source-year",
+            "category": "adversarial lexical overlap",
+            "split": "calibration",
+            "course": "marine-gardening",
+            "query": "In what year was the tidal moss TM-06 six-hour schedule published?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": []
+        },
+        {
+            "label": "marine-fact-in-orbital-course",
+            "category": "vocabulary-overlap isolation",
+            "split": "calibration",
+            "course": "orbital-gardening",
+            "query": "What is the tidal moss watering interval in the orbital greenhouse?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": [
+                "marine-gardening"
+            ]
+        },
+        {
+            "label": "night-orchid-inventor",
+            "category": "wrong-attribute",
+            "split": "calibration",
+            "course": "orbital-gardening",
+            "query": "Who designed the forty-degree night orchid heliostat?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": []
+        },
+        {
+            "label": "marine-docking-bay",
+            "category": "exact-answer",
+            "split": "holdout",
+            "course": "marine-gardening",
+            "query": "Which docking bay receives marine deliveries?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "marine-logistics.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": [
+                "orbital-gardening"
+            ]
+        },
+        {
+            "label": "orbital-seed-mass-paraphrase",
+            "category": "paraphrase",
+            "split": "holdout",
+            "course": "orbital-gardening",
+            "query": "How heavy is the seed canister for the orbital garden?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "orbital-logistics.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": []
+        },
+        {
+            "label": "marine-pressure-paraphrase",
+            "category": "paraphrase",
+            "split": "holdout",
+            "course": "marine-gardening",
+            "query": "At what pressure is the tidal greenhouse maintained?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "marine-climate.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": []
+        },
+        {
+            "label": "orbital-pressure-and-coefficient",
+            "category": "same-course cross-document",
+            "split": "holdout",
+            "course": "orbital-gardening",
+            "query": "What are the orbital greenhouse pressure and Blueleaf coefficient?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "orbital-climate.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                },
+                {
+                    "filename": "orbital-gardening.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": [
+                "marine-gardening"
+            ]
+        },
+        {
+            "label": "eclipse-wait-and-archive",
+            "category": "multi-chunk",
+            "split": "holdout",
+            "course": "orbital-gardening",
+            "query": "How long does the eclipse shade phase wait, and what archive tag follows?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "eclipse-protocol.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 3
+                },
+                {
+                    "filename": "eclipse-protocol.md",
+                    "chunk_index": 1,
+                    "source_type": "section",
+                    "source_start": 3,
+                    "source_end": 4
+                }
+            ],
+            "forbidden_courses": []
+        },
+        {
+            "label": "contradictory-orbital-blueleaf",
+            "category": "contradictory-course isolation",
+            "split": "holdout",
+            "course": "orbital-gardening",
+            "query": "What is the Orbital Blueleaf coefficient?",
+            "answerable": true,
+            "expected_evidence": [
+                {
+                    "filename": "orbital-gardening.md",
+                    "chunk_index": 0,
+                    "source_type": "section",
+                    "source_start": 1,
+                    "source_end": 2
+                }
+            ],
+            "forbidden_courses": [
+                "marine-gardening"
+            ]
+        },
+        {
+            "label": "tidal-greenhouse-mayor",
+            "category": "unsupported unrelated",
+            "split": "holdout",
+            "course": "marine-gardening",
+            "query": "Who is the mayor of the tidal greenhouse district?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": []
+        },
+        {
+            "label": "orbital-greenhouse-humidity",
+            "category": "unsupported plausible domain",
+            "split": "holdout",
+            "course": "orbital-gardening",
+            "query": "What humidity level is required for the orbital greenhouse?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": []
+        },
+        {
+            "label": "comet-moss-naming",
+            "category": "near-miss",
+            "split": "holdout",
+            "course": "orbital-gardening",
+            "query": "Who named comet moss and assigned its CM-16 identifier?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": []
+        },
+        {
+            "label": "marine-bay-construction-date",
+            "category": "wrong-attribute",
+            "split": "holdout",
+            "course": "marine-gardening",
+            "query": "When was marine docking bay M-4 constructed?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": []
+        },
+        {
+            "label": "orbital-pressure-sensor-maker",
+            "category": "adversarial lexical overlap",
+            "split": "holdout",
+            "course": "orbital-gardening",
+            "query": "Which manufacturer made the eighty-one kilopascal orbital greenhouse pressure sensor?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": []
+        },
+        {
+            "label": "marine-salinity-discovery-year",
+            "category": "adversarial lexical overlap",
+            "split": "holdout",
+            "course": "marine-gardening",
+            "query": "In what year was the tidal greenhouse salinity index of eighteen discovered?",
+            "answerable": false,
+            "expected_evidence": [],
+            "forbidden_courses": []
         }
-      ],
-      "forbidden_courses": ["orbital-gardening"]
-    }
-  ]
+    ]
 }
