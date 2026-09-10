@@ -43,6 +43,8 @@ yarn-error.log*
 /runtime/*.db-*
 /runtime/*.sqlite
 /runtime/*.sqlite3
+/benchmarks/local/*
+!/benchmarks/local/.gitignore
 *.db
 *.db-*
 *.sqlite

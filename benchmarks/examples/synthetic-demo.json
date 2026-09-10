@@ -1,0 +1,62 @@
+{
+  "version": "synthetic-demo-v1",
+  "cases": [
+    {
+      "id": "physics-gauss-law-001",
+      "course_id": "synthetic-physics",
+      "question": "What does Gauss law relate?",
+      "type": "answerable",
+      "category": "direct_factual",
+      "expected": {
+        "supporting_sources": [
+          {"document": "gauss.md", "source_type": "section", "start": 1, "end": 1}
+        ]
+      }
+    },
+    {
+      "id": "physics-conductor-001",
+      "course_id": "synthetic-physics",
+      "question": "What is the electric field inside a conductor?",
+      "type": "answerable",
+      "category": "concept_explanation",
+      "expected": {
+        "supporting_sources": [
+          {"document": "conductor.md", "source_type": "section", "start": 1, "end": 1}
+        ]
+      }
+    },
+    {
+      "id": "physics-coulomb-001",
+      "course_id": "synthetic-physics",
+      "question": "Who discovered Coulomb law?",
+      "type": "unsupported",
+      "category": "near_miss",
+      "expected": {"supporting_sources": []}
+    },
+    {
+      "id": "physics-combined-001",
+      "course_id": "synthetic-physics",
+      "question": "What do the Gauss law and conductor statements say?",
+      "type": "answerable",
+      "category": "multi_document",
+      "expected": {
+        "supporting_sources": [
+          {"document": "gauss.md", "source_type": "section", "start": 1, "end": 1},
+          {"document": "conductor.md", "source_type": "section", "start": 1, "end": 1}
+        ]
+      }
+    },
+    {
+      "id": "physics-gauss-citation-001",
+      "course_id": "synthetic-physics",
+      "question": "Which statement relates electric flux to enclosed charge?",
+      "type": "answerable",
+      "category": "citation_sensitive",
+      "expected": {
+        "supporting_sources": [
+          {"document": "gauss.md", "source_type": "section", "start": 1, "end": 1}
+        ]
+      }
+    }
+  ]
+}

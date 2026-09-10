@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,9 @@ from course_rag_api.support import SupportDecision, SupportStatus
 
 EVALUATION_DATASET = (
     Path(__file__).parents[2] / "examples/retrieval-evaluation/dataset.json"
+)
+BENCHMARK_DATASET = (
+    Path(__file__).parents[2] / "benchmarks/examples/synthetic-demo.json"
 )
 
 
@@ -118,6 +122,69 @@ def test_cli_evaluates_retrieval_and_writes_json(
     monkeypatch.setenv("COURSE_RAG_EMBEDDING_PROVIDER", "deterministic")
     monkeypatch.delenv("COURSE_RAG_EMBEDDING_MODEL", raising=False)
     monkeypatch.delenv("COURSE_RAG_EMBEDDING_DIMENSION", raising=False)
+    get_settings.cache_clear()
+
+
+def test_cli_runs_local_benchmark_and_writes_json(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database = tmp_path / "metadata.sqlite3"
+    output_path = tmp_path / "benchmark.json"
+    monkeypatch.setenv("COURSE_RAG_QDRANT_PATH", str(tmp_path / "qdrant"))
+    monkeypatch.setenv("COURSE_RAG_EMBEDDING_PROVIDER", "deterministic")
+    get_settings.cache_clear()
+    main(["--database", str(database), "create-course", "Benchmark Demo"])
+    course_id = capsys.readouterr().out.split("Course ID: ", 1)[1].strip()
+    for filename, text in (
+        ("gauss.md", "Gauss law relates electric flux to enclosed charge."),
+        ("conductor.md", "The electric field inside a conductor is zero."),
+    ):
+        path = tmp_path / filename
+        path.write_text(text)
+        assert main(["--database", str(database), "ingest", "--course", course_id, str(path)]) == 0
+        capsys.readouterr()
+    assert main(["--database", str(database), "index-course", "--course", course_id]) == 0
+    capsys.readouterr()
+
+    assert (
+        main(
+            [
+                "--database",
+                str(database),
+                "benchmark",
+                "--dataset",
+                str(BENCHMARK_DATASET),
+                "--course",
+                course_id,
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+
+    assert "Benchmark evaluation" in output
+    assert "Failure analysis" in output
+    assert '"dataset_version": "synthetic-demo-v1"' in output_path.read_text()
+
+    assert (
+        main(
+            [
+                "--database",
+                str(database),
+                "benchmark",
+                "--dataset",
+                str(BENCHMARK_DATASET),
+                "--course",
+                course_id,
+            ]
+        )
+        == 0
+    )
+    assert json.loads(capsys.readouterr().out)["dataset_version"] == "synthetic-demo-v1"
     get_settings.cache_clear()
 
     assert (

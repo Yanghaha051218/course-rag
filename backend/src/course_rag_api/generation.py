@@ -8,7 +8,11 @@ from openai import OpenAI
 from course_rag_api.config import Settings
 from course_rag_api.errors import ConfigurationError, GenerationError
 from course_rag_api.models import RetrievedChunk, SourceType
-from course_rag_api.support import SupportStatus, SupportVerificationService
+from course_rag_api.support import (
+    SupportDecision,
+    SupportStatus,
+    SupportVerificationService,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -292,6 +296,38 @@ class AnswerGenerationService:
         decision = self.support.verify_retrieved_evidence(
             course_id=course_id, question=question, evidence=evidence
         )
+        return self._answer_after_support_decision(
+            course_id=course_id,
+            question=question,
+            evidence=evidence,
+            decision=decision,
+        )
+
+    def answer_verified_evidence(
+        self,
+        *,
+        course_id: str,
+        question: str,
+        evidence: Sequence[RetrievedChunk],
+        decision: object,
+    ) -> FinalResponse:
+        return self._answer_after_support_decision(
+            course_id=course_id,
+            question=question,
+            evidence=evidence,
+            decision=self.support.validate_retrieved_decision(
+                course_id=course_id, evidence=evidence, decision=decision
+            ),
+        )
+
+    def _answer_after_support_decision(
+        self,
+        *,
+        course_id: str,
+        question: str,
+        evidence: Sequence[RetrievedChunk],
+        decision: SupportDecision,
+    ) -> FinalResponse:
         if decision.status is not SupportStatus.SUPPORTED:
             return self._abstain(decision.reason)
         chunks_by_id = {chunk.chunk_id: chunk for chunk in evidence}

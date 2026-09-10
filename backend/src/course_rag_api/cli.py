@@ -14,6 +14,11 @@ from course_rag_api.calibration import (
     evaluate_policy,
     summarize_distribution,
 )
+from course_rag_api.benchmark import (
+    format_benchmark_report,
+    load_benchmark_dataset,
+    run_benchmark,
+)
 from course_rag_api.config import get_settings
 from course_rag_api.embeddings import create_embedding_provider
 from course_rag_api.evidence import EvidenceGate
@@ -23,6 +28,7 @@ from course_rag_api.evaluation import (
     load_evaluation_dataset,
     run_retrieval_evaluation,
 )
+from course_rag_api.generation import create_generator
 from course_rag_api.indexing import IndexingService
 from course_rag_api.ingestion import ingest_document
 from course_rag_api.models import IndexingSummary
@@ -67,6 +73,13 @@ def _parser() -> argparse.ArgumentParser:
     verify_support.add_argument("--course", required=True)
     verify_support.add_argument("--query", required=True)
     verify_support.add_argument("--limit", type=int, default=5)
+    benchmark = commands.add_parser("benchmark")
+    benchmark.add_argument("--dataset", required=True, type=Path)
+    benchmark.add_argument("--course", required=True)
+    benchmark.add_argument("--limit", type=int, default=5)
+    benchmark.add_argument("--verify-support", action="store_true")
+    benchmark.add_argument("--generate", action="store_true")
+    benchmark.add_argument("--output", type=Path)
     return parser
 
 
@@ -320,6 +333,37 @@ def main(argv: Sequence[str] | None = None) -> int:
                     print("Supporting evidence:")
                     for chunk_id in decision.supporting_chunk_ids:
                         print(f"- chunk_id={chunk_id}")
+                return 0
+            if args.command == "benchmark":
+                if args.generate and not args.verify_support:
+                    raise ValueError("--generate requires --verify-support")
+                dataset = load_benchmark_dataset(args.dataset)
+                retriever = Retriever(store, index, provider)
+                support = (
+                    SupportVerificationService(
+                        store,
+                        retriever,
+                        create_support_verifier(settings),
+                        args.limit,
+                    )
+                    if args.verify_support
+                    else None
+                )
+                report = run_benchmark(
+                    dataset,
+                    course_id=args.course,
+                    retriever=retriever,
+                    limit=args.limit,
+                    support=support,
+                    generator=create_generator(settings) if args.generate else None,
+                )
+                if args.output is not None:
+                    print(format_benchmark_report(report))
+                    args.output.parent.mkdir(parents=True, exist_ok=True)
+                    args.output.write_text(report.to_json(), encoding="utf-8")
+                    print(f"JSON: {args.output}")
+                else:
+                    print(report.to_json(), end="")
                 return 0
             results = Retriever(store, index, provider).retrieve(
                 course_id=args.course, query=args.query, limit=args.limit

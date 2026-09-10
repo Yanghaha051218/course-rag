@@ -272,6 +272,24 @@ class SupportVerificationService:
             )
         except Exception:
             return self._closed("verifier_error")
+        return self.validate_retrieved_decision(
+            course_id=course_id, evidence=evidence, decision=decision
+        )
+
+    def validate_retrieved_decision(
+        self,
+        *,
+        course_id: str,
+        evidence: Sequence[RetrievedChunk],
+        decision: object,
+    ) -> SupportDecision:
+        if not evidence:
+            return self._closed("no_evidence_retrieved")
+        evidence = tuple(evidence)
+        if any(chunk.course_id != course_id for chunk in evidence):
+            return self._closed("foreign_course_evidence")
+        if not self._has_valid_provenance(course_id, evidence):
+            return self._closed("invalid_retrieved_evidence")
         return self._validated_decision(decision, evidence)
 
     def _has_valid_provenance(

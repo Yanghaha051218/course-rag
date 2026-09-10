@@ -2,12 +2,12 @@
 
 ## Scope and status
 
-Milestone 3-B implements local document parsing and persistence, embedding,
+Milestone 4-A implements local document parsing and persistence, embedding,
 Qdrant indexing, course-scoped retrieval, offline retrieval evaluation, the
-M2-B similarity baseline, support verification, and a backend grounded-answer
-service. The FastAPI surface remains the Milestone 0 `/health` endpoint, and
-the Next.js page remains static. The answer service is not exposed by HTTP or a
-CLI yet.
+M2-B similarity baseline, support verification, a backend grounded-answer
+service, and a local benchmark runner. The FastAPI surface remains the
+Milestone 0 `/health` endpoint, and the Next.js page remains static. The answer
+service is not exposed by HTTP; it is exercised locally by the benchmark runner.
 
 ## Primary invariant
 
@@ -49,6 +49,7 @@ flowchart TD
     F --> C[Citation validator]
     C --> Z[ANSWERED or ABSTAINED FinalResponse]
     V --> A[INSUFFICIENT or CONFLICTING]
+    O --> Bm[Local benchmark metrics and failure analysis]
 ```
 
 ## Major components
@@ -122,6 +123,17 @@ reuses the production ingestion, indexing, and retrieval path, and reports
 Hit@k, Recall@k, raw scores, and course-isolation status. It makes no evidence
 sufficiency decision. The checked-in corpus and labels are synthetic and
 human-readable; optional JSON output belongs under ignored runtime storage.
+
+### Real-course benchmark evaluation
+
+The M4-A `benchmark` CLI runs against one already-ingested local course. A
+human-curated dataset records question type and source locators, never reference
+answers. It reports Hit@1/3/5, Recall@1/3/5, MRR, optional support and citation
+metrics, and per-case failure categories. It records provider/model identity,
+embedding dimension, retrieval limit, dataset version, and optional verifier and
+generator identity. Real datasets, course documents, and reports remain local;
+the checked-in example is fictional and used only for regression tests. See
+[benchmarking.md](benchmarking.md).
 
 ### Similarity baseline, support verifier, and grounded generation
 

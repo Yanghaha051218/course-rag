@@ -8,14 +8,15 @@ abstain instead of filling gaps with a model's pretrained knowledge.
 
 ## Status
 
-**Early development — Milestone 3-B.**
+**Early development — Milestone 4-A.**
 
 The repository now implements local document ingestion, source-aware parsing,
 deterministic chunking, SQLite metadata persistence, embedding providers,
 Qdrant indexing, course-scoped vector retrieval, deterministic retrieval
 evaluation, the M2-B similarity-gate baseline, evidence support verification,
-and a backend grounded-generation service. No question-answering HTTP endpoint
-or chat UI exists yet.
+and a backend grounded-generation service. A local real-course benchmark runner
+now measures those stages without committing course materials. No
+question-answering HTTP endpoint or chat UI exists yet.
 
 ## Grounding principle
 
@@ -71,6 +72,8 @@ The fuller component and data-flow design is in
   validated source citations, or explicit `ABSTAINED` responses.
 - Citation validation that rejects invented, foreign-course, and unapproved
   chunk bindings before an answer is returned.
+- Local benchmark runner with separate retrieval, support, citation, and
+  failure-analysis metrics for human-curated course questions.
 - Developer-facing ingestion CLI.
 
 ## Planned features
@@ -88,6 +91,7 @@ course-rag/
 ├── backend/                 FastAPI application and Python package metadata
 ├── frontend/                Next.js TypeScript application
 ├── docs/                    Architecture, grounding, ingestion, and retrieval
+├── benchmarks/               Benchmark schema, synthetic demo, local ignore rules
 ├── examples/                Two original contradictory synthetic courses
 ├── runtime/                 Local uploads, databases, and vector data (ignored)
 └── tests/backend/           Backend API tests
@@ -243,6 +247,24 @@ The only current verifier provider is OpenAI. Configure it with
 [docs/support-verification.md](docs/support-verification.md). Automated tests
 mock this boundary; no live verifier result is claimed.
 
+## Benchmark an authorized local course
+
+Create a human-curated benchmark outside Git using the documented
+[benchmark schema](benchmarks/schema.md), then run it only after local ingestion
+and indexing:
+
+```bash
+course-rag benchmark \
+  --dataset benchmarks/local/physics2.json \
+  --course <course-id> \
+  --output runtime/evaluations/physics2-retrieval.json
+```
+
+The default run measures retrieval only. Add `--verify-support` to evaluate the
+configured support verifier, or `--verify-support --generate` to include the
+grounded generator and citation validation. The JSON report keeps these metrics
+separate and contains failure analysis. See [docs/benchmarking.md](docs/benchmarking.md).
+
 ## Verification commands
 
 ```bash
@@ -271,6 +293,10 @@ development and testing.
 **Never commit real course materials to a public repository.** Only synthetic,
 original fixtures created specifically for testing belong in `examples/`.
 Never commit API keys or a populated `.env` file.
+
+Real-course benchmark files, source documents, and generated reports stay local:
+`benchmarks/local/` and `runtime/` are ignored. Run benchmarks only with course
+materials you are authorized to use.
 
 The project should remain private until the planned public-release audit checks
 licensing, secrets, test fixtures, dependency risk, documentation, and tracked

@@ -234,3 +234,33 @@ def test_generation_exception_or_invalid_citation_fails_closed(tmp_path) -> None
         FinalStatus.ABSTAINED,
         "citation_validation_failed",
     )
+
+
+def test_preverified_evidence_is_revalidated_before_generation(tmp_path) -> None:
+    store, course_id, chunks = _stored_chunks(tmp_path)
+    verifier = ScriptedVerifier(
+        SupportDecision(
+            SupportStatus.SUPPORTED,
+            "explicit_support",
+            ("chunk-0",),
+            "scripted",
+            "support-test-v1",
+        )
+    )
+    generator = ScriptedGenerator(_answer("chunk-0"))
+    service = AnswerGenerationService(
+        SupportVerificationService(store, StaticRetriever(chunks), verifier), generator
+    )
+
+    response = service.answer_verified_evidence(
+        course_id=course_id,
+        question="What is the coefficient?",
+        evidence=(replace(chunks[0], course_id="foreign-course"),),
+        decision=verifier.decision,
+    )
+
+    assert (response.status, response.reason) == (
+        FinalStatus.ABSTAINED,
+        "foreign_course_evidence",
+    )
+    assert generator.calls == 0

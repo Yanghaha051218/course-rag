@@ -37,10 +37,10 @@ equal scores in the small evaluation corpus.
 
 ## What it does not measure
 
-This is not an answer-quality, factuality, citation, generation, or user-facing
-evaluation. It does not decide whether retrieved evidence is sufficient and it
-does not measure the quality of an OpenAI embedding model when run with the
-default deterministic lexical provider.
+This M2 synthetic harness is not a real-course, answer-quality, factuality,
+citation, generation, or user-facing evaluation. It does not decide whether
+retrieved evidence is sufficient and it does not measure the quality of an
+OpenAI embedding model when run with the default deterministic lexical provider.
 
 A raw cosine similarity score is not a calibrated probability and must not be
 displayed as confidence. Its scale depends on the embedding provider, corpus,
@@ -62,6 +62,11 @@ The same 40 labels map answerable to `SUPPORTED` and unsupported to
 `INSUFFICIENT`; `support_conflicts` supplies a separate same-course conflict
 fixture. Live semantic metrics require a real verifier run and are not claimed
 by mocked tests.
+
+For human-curated benchmarks against an already-ingested authorized course, use
+the M4-A local [benchmarking workflow](benchmarking.md). It retains retrieval,
+support, and citation measurements as separate metrics and adds per-case failure
+analysis without adding a product interface.
 
 ## Run it
 
