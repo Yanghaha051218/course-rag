@@ -1,4 +1,5 @@
 import json
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -13,6 +14,7 @@ from course_rag_api.ingestion import ingest_document
 from course_rag_api.models import RetrievedChunk, SourceType
 from course_rag_api.retrieval import Retriever
 from course_rag_api.storage import SQLiteStore
+from course_rag_api.support import SupportDecision, SupportStatus
 from course_rag_api.vector_store import QdrantVectorIndex
 
 
@@ -63,12 +65,22 @@ class EvaluationCase:
 
 
 @dataclass(frozen=True, slots=True)
+class SupportConflictCase:
+    label: str
+    course: str
+    query: str
+    evidence: tuple[str, ...]
+    expected_status: SupportStatus
+
+
+@dataclass(frozen=True, slots=True)
 class EvaluationDataset:
     version: str
     chunk_target_size: int
     chunk_overlap: int
     courses: tuple[EvaluationCourse, ...]
     cases: tuple[EvaluationCase, ...]
+    support_conflicts: tuple[SupportConflictCase, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +128,18 @@ class EvaluationReport:
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), indent=2, sort_keys=True) + "\n"
+
+
+@dataclass(frozen=True, slots=True)
+class SupportVerificationMetrics:
+    supported_answerable: int
+    missed_answerable: int
+    incorrectly_supported_unsupported: int
+    correctly_rejected_unsupported: int
+    correctly_detected_conflicts: int
+    answerable_support_rate: float
+    unsupported_false_support_rate: float
+    conflict_detection_rate: float
 
 
 def _nonempty_string(value: Any, field: str) -> str:
@@ -272,8 +296,43 @@ def load_evaluation_dataset(path: Path) -> EvaluationDataset:
             )
         )
 
+    raw_conflicts = raw.get("support_conflicts", [])
+    if not isinstance(raw_conflicts, list):
+        raise ValueError("support_conflicts must be a list")
+    conflicts: list[SupportConflictCase] = []
+    conflict_labels: set[str] = set()
+    for index, item in enumerate(raw_conflicts):
+        if not isinstance(item, dict):
+            raise ValueError(f"support_conflicts[{index}] must be an object")
+        label = _nonempty_string(item.get("label"), f"support_conflicts[{index}].label")
+        if label in conflict_labels or label in labels:
+            raise ValueError(f"duplicate support conflict label: {label}")
+        conflict_labels.add(label)
+        course = _nonempty_string(
+            item.get("course"), f"support_conflicts[{index}].course"
+        )
+        if course not in course_documents:
+            raise ValueError(f"unknown course in support conflict {label}: {course}")
+        query = _nonempty_string(item.get("query"), f"support_conflicts[{index}].query")
+        evidence = item.get("evidence")
+        if (
+            not isinstance(evidence, list)
+            or len(evidence) < 2
+            or any(not isinstance(text, str) or not text.strip() for text in evidence)
+        ):
+            raise ValueError(
+                f"support conflict {label} requires two non-empty evidence texts"
+            )
+        if item.get("expected_status") != SupportStatus.CONFLICTING.value:
+            raise ValueError(f"support conflict {label} must expect CONFLICTING")
+        conflicts.append(
+            SupportConflictCase(
+                label, course, query, tuple(evidence), SupportStatus.CONFLICTING
+            )
+        )
+
     return EvaluationDataset(
-        version, target_size, overlap, tuple(courses), tuple(cases)
+        version, target_size, overlap, tuple(courses), tuple(cases), tuple(conflicts)
     )
 
 
@@ -378,6 +437,55 @@ def summarize_results(results: tuple[EvaluationCaseResult, ...]) -> EvaluationRe
         recall_at,
         all(result.isolation_passed for result in results),
         results,
+    )
+
+
+def summarize_support_verification(
+    cases: Sequence[EvaluationCase],
+    decisions: Mapping[str, SupportDecision],
+    *,
+    conflict_cases: Sequence[SupportConflictCase] = (),
+    conflict_decisions: Mapping[str, SupportDecision] | None = None,
+) -> SupportVerificationMetrics:
+    if {case.label for case in cases} != set(decisions):
+        raise ValueError(
+            "support decisions must cover each evaluation case exactly once"
+        )
+    answerable = [case for case in cases if case.answerable]
+    unsupported = [case for case in cases if not case.answerable]
+    supported_answerable = sum(
+        decisions[case.label].status is SupportStatus.SUPPORTED for case in answerable
+    )
+    incorrectly_supported_unsupported = sum(
+        decisions[case.label].status is SupportStatus.SUPPORTED for case in unsupported
+    )
+    conflict_decisions = conflict_decisions or {}
+    if {case.label for case in conflict_cases} != set(conflict_decisions):
+        raise ValueError("support decisions must cover each conflict case exactly once")
+    conflict_count = len(conflict_cases)
+    correctly_detected_conflicts = sum(
+        conflict_decisions[case.label].status is case.expected_status
+        for case in conflict_cases
+    )
+    return SupportVerificationMetrics(
+        supported_answerable=supported_answerable,
+        missed_answerable=len(answerable) - supported_answerable,
+        incorrectly_supported_unsupported=incorrectly_supported_unsupported,
+        correctly_rejected_unsupported=(
+            len(unsupported) - incorrectly_supported_unsupported
+        ),
+        correctly_detected_conflicts=correctly_detected_conflicts,
+        answerable_support_rate=(
+            supported_answerable / len(answerable) if answerable else 0.0
+        ),
+        unsupported_false_support_rate=(
+            incorrectly_supported_unsupported / len(unsupported)
+            if unsupported
+            else 0.0
+        ),
+        conflict_detection_rate=(
+            correctly_detected_conflicts / conflict_count if conflict_count else 0.0
+        ),
     )
 
 

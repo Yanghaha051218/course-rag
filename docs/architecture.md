@@ -2,11 +2,12 @@
 
 ## Scope and status
 
-Milestone 2-B implements local document parsing and persistence, embedding,
-Qdrant indexing, course-scoped retrieval, offline retrieval evaluation, and a
-provider-bound Evidence Gate behind a developer CLI. The FastAPI surface
-remains the Milestone 0 `/health` endpoint, and the Next.js page remains
-static. Components labelled **planned** do not exist yet.
+Milestone 3-A implements local document parsing and persistence, embedding,
+Qdrant indexing, course-scoped retrieval, offline retrieval evaluation, the
+M2-B similarity baseline, and support verification behind developer CLI
+commands. The FastAPI surface remains the Milestone 0 `/health` endpoint, and
+the Next.js page remains static. Components labelled **planned** do not exist
+yet.
 
 ## Primary invariant
 
@@ -18,15 +19,16 @@ when the selected course does not yield sufficient evidence.
 flowchart TD
     Q[Question + selected course ID] --> S[Validate request and course scope]
     S --> R[Retrieve only course-scoped chunks]
-    R --> G{Evidence sufficient?}
-    G -- No --> A[Return explicit abstention]
-    G -- Yes --> L[Call generation provider with retrieved evidence]
+    R --> V{Support verified?}
+    V -- INSUFFICIENT or CONFLICTING --> A[Return explicit abstention]
+    V -- SUPPORTED --> L[Planned generator with verified evidence]
     L --> C[Validate claims and citations]
     C --> O[Return grounded answer with citations]
 ```
 
-The `No` branch ends before provider invocation. A prompt asking a model to
-abstain is a useful secondary control, but it cannot replace this backend branch.
+The non-supported branch ends before any future generation-provider invocation.
+A prompt asking a model to abstain is a useful secondary control, but it cannot
+replace this backend branch.
 
 The implemented path stops at structured retrieval results:
 
@@ -41,9 +43,10 @@ flowchart TD
     V --> R[Course-filtered Retriever]
     R --> O[RetrievedChunk array]
     O --> M[Offline retrieval measurements]
-    O --> G[Calibrated Evidence Gate]
-    G --> F[Future generator on ALLOW only]
-    G --> A[Explicit abstain]
+    O --> B[M2-B similarity-gate baseline]
+    O --> V[Support Verifier]
+    V --> F[Future generator on SUPPORTED only]
+    V --> A[INSUFFICIENT or CONFLICTING]
 ```
 
 ## Major components
@@ -114,17 +117,33 @@ Hit@k, Recall@k, raw scores, and course-isolation status. It makes no evidence
 sufficiency decision. The checked-in corpus and labels are synthetic and
 human-readable; optional JSON output belongs under ignored runtime storage.
 
-### Evidence gate (implemented) and citation validator (planned)
+### Similarity baseline, support verifier (implemented), and citation validator (planned)
 
-The Evidence Gate verifies provider identity against an empirical calibration
-artifact, rejects empty or foreign-course results, and applies a calibrated
-top-1 similarity policy. It returns a structured allow/abstain decision and
-preserves `RetrievedChunk` provenance only for allow. It neither generates an
-answer nor decides factual truth; calibration labels remain evaluation-only.
+The M2-B Evidence Gate remains an evaluated provider-bound top-1 similarity
+baseline. Its strict threshold gave zero answerable holdout coverage on the
+current synthetic corpus, so it is not a mandatory prerequisite for M3-A.
+
+The Support Verifier receives only the selected question and already
+course-scoped `RetrievedChunk` values. It classifies the evidence as
+`SUPPORTED`, `INSUFFICIENT`, or `CONFLICTING`; the backend validates all bound
+chunk IDs against the retrieved set and SQLite provenance before preserving a
+decision. It neither generates an answer nor decides factual truth beyond
+whether the supplied evidence can support answering the question.
 
 After future generation, a citation validator will reject or downgrade unsupported
 claims, verify that cited chunk IDs were in the approved evidence set, and
 return locators suitable for the source format.
+
+## Grounding layers
+
+1. **Course-isolated retrieval — implemented.** Qdrant filters before results
+   are hydrated and SQLite revalidates provenance.
+2. **Similarity-gate baseline — implemented, experimentally too conservative
+   on the current holdout.** It remains available for comparison.
+3. **Evidence Support Verifier — implemented.** It fails closed unless a
+   structured decision binds valid retrieved evidence.
+4. **Answer generator constrained to verified evidence — not implemented.**
+5. **Claim/citation validation — not implemented.**
 
 ## Course isolation
 

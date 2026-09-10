@@ -10,6 +10,7 @@ from course_rag_api.calibration import (
 from course_rag_api.cli import main
 from course_rag_api.config import get_settings
 from course_rag_api.storage import SQLiteStore
+from course_rag_api.support import SupportDecision, SupportStatus
 
 
 EVALUATION_DATASET = (
@@ -229,4 +230,63 @@ def test_cli_inspects_evidence_without_generating_an_answer(
     assert "Evidence:" in output
     assert "lesson.txt" in output
     assert "answer" not in output.casefold()
+    get_settings.cache_clear()
+
+
+def test_cli_verifies_support_without_printing_an_answer(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class ScriptedSupportVerifier:
+        provider_name = "scripted"
+        model_name = "test-v1"
+
+        def verify(self, **_: object) -> SupportDecision:
+            return SupportDecision(
+                SupportStatus.SUPPORTED,
+                "explicit_support",
+                (chunk_id,),
+                self.provider_name,
+                self.model_name,
+            )
+
+    database = tmp_path / "metadata.sqlite3"
+    monkeypatch.setenv("COURSE_RAG_QDRANT_PATH", str(tmp_path / "qdrant"))
+    monkeypatch.setenv("COURSE_RAG_EMBEDDING_PROVIDER", "deterministic")
+    get_settings.cache_clear()
+    main(["--database", str(database), "create-course", "Support Demo"])
+    course_id = capsys.readouterr().out.split("Course ID: ", 1)[1].strip()
+    path = tmp_path / "lesson.txt"
+    path.write_text("The Blueleaf coefficient is 7.25.")
+    main(["--database", str(database), "ingest", "--course", course_id, str(path)])
+    capsys.readouterr()
+    main(["--database", str(database), "index-course", "--course", course_id])
+    capsys.readouterr()
+    chunk_id = SQLiteStore(database).list_chunks(course_id)[0].id
+    monkeypatch.setattr(
+        "course_rag_api.cli.create_support_verifier",
+        lambda _: ScriptedSupportVerifier(),
+    )
+
+    assert (
+        main(
+            [
+                "--database",
+                str(database),
+                "verify-support",
+                "--course",
+                course_id,
+                "--query",
+                "What is the Blueleaf coefficient?",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+
+    assert "Decision: SUPPORTED" in output
+    assert "Supporting evidence:" in output
+    assert chunk_id in output
+    assert "7.25" not in output
     get_settings.cache_clear()

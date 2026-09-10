@@ -8,13 +8,14 @@ abstain instead of filling gaps with a model's pretrained knowledge.
 
 ## Status
 
-**Early development — Milestone 2-B.**
+**Early development — Milestone 3-A.**
 
 The repository now implements local document ingestion, source-aware parsing,
 deterministic chunking, SQLite metadata persistence, embedding providers,
 Qdrant indexing, course-scoped vector retrieval, deterministic retrieval
-evaluation, and a calibrated Evidence Gate that returns allow or abstain. Answer
-generation, final citations, and question answering are not implemented yet.
+evaluation, the M2-B similarity-gate baseline, and evidence support
+verification. Answer generation, final citations, and question answering are
+not implemented yet.
 
 ## Grounding principle
 
@@ -23,7 +24,7 @@ The planned answer path is:
 ```text
 Question + selected course
   -> retrieve course-scoped evidence
-  -> validate evidence sufficiency
+  -> verify support from the retrieved evidence
   -> if insufficient: abstain without calling a generation model
   -> if sufficient: generate only from the evidence
   -> validate and return citations
@@ -43,13 +44,15 @@ instructions. Prompting alone is not considered an enforcement boundary. See
 - **Embeddings:** deterministic offline and OpenAI providers behind one small
   interface.
 - **Generation:** planned; no generation provider or model call exists yet.
-- **Evidence gate (implemented):** provider-bound retrieval sufficiency and
-  explicit abstention; citation validation is planned.
+- **Similarity-gate baseline (implemented):** a provider-bound M2-B threshold
+  retained for comparison, not a prerequisite for support verification.
+- **Support verification (implemented):** a fail-closed verifier binds
+  `SUPPORTED` decisions to retrieved, provenance-checked chunk IDs.
 
 The fuller component and data-flow design is in
 [docs/architecture.md](docs/architecture.md).
 
-## Implemented through Milestone 2-B
+## Implemented through Milestone 3-A
 
 - Course creation and course-owned document metadata.
 - PDF page, PPTX slide, DOCX paragraph, Markdown, and text parsing.
@@ -61,11 +64,13 @@ The fuller component and data-flow design is in
 - Offline retrieval evaluation with Hit@k, Recall@k, raw-score collection, and
   explicit cross-course isolation checks.
 - Provider-bound calibration artifacts and a top-1 retrieval abstention gate.
+- Support verification with `SUPPORTED`, `INSUFFICIENT`, and `CONFLICTING`
+  outcomes; only verified chunk IDs may support `SUPPORTED`.
 - Developer-facing ingestion CLI.
 
 ## Planned features
 
-- Evidence sufficiency checks before any generation request.
+- Generation that receives only `SUPPORTED` verified chunks.
 - Answers with locatable citations into the source materials.
 - Explicit unsupported or insufficient-evidence responses.
 - Additional embedding providers and a future generation provider.
@@ -217,6 +222,24 @@ provider/model/dimension. The gate preserves retrieved provenance on `ALLOW` and
 returns `ABSTAIN` otherwise; it never generates a natural-language answer. See
 [docs/evidence-gating.md](docs/evidence-gating.md).
 
+## Verify evidence support
+
+The M3-A verifier is separate from the M2-B similarity threshold. It receives
+only the selected question and course-scoped retrieved chunks, then returns a
+structured status and chunk bindings—never an answer:
+
+```bash
+course-rag verify-support \
+  --course <course-id> \
+  --query "Who discovered the Blueleaf coefficient?"
+```
+
+The only current verifier provider is OpenAI. Configure it with
+`COURSE_RAG_VERIFIER_PROVIDER=openai`,
+`COURSE_RAG_VERIFIER_MODEL=<model>`, and `OPENAI_API_KEY`. See
+[docs/support-verification.md](docs/support-verification.md). Automated tests
+mock this boundary; no live verifier result is claimed.
+
 ## Verification commands
 
 ```bash
@@ -233,9 +256,12 @@ Course materials may contain copyrighted, private, or personally identifiable
 information. Runtime uploads, SQLite files, Qdrant data, local environment
 files, and build outputs are ignored by Git.
 
-When the OpenAI embedding provider is selected, document chunk text and query
-text are sent to OpenAI for embedding. The deterministic provider stays local
-and exists only for reproducible development and testing.
+Parsing, SQLite, and local Qdrant remain local. When the OpenAI embedding
+provider is selected, document chunk text and query text are sent to OpenAI for
+embedding. When the OpenAI support verifier is selected, the question and only
+the retrieved evidence text/provenance for the selected course are sent to
+OpenAI. The deterministic embedding provider stays local and exists only for
+reproducible development and testing.
 
 **Never commit real course materials to a public repository.** Only synthetic,
 original fixtures created specifically for testing belong in `examples/`.

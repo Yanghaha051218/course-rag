@@ -1,6 +1,6 @@
-# Calibrated evidence gate
+# Calibrated similarity-gate baseline
 
-Milestone 2-B adds a decision layer between retrieval and any future answer
+Milestone 2-B adds an evaluated baseline between retrieval and any future answer
 generation:
 
 ```text
@@ -9,9 +9,8 @@ selected course + query -> course-scoped retrieval -> Evidence Gate -> allow | a
 
 The gate does not generate text, inspect ground-truth labels, use keywords, or
 know answers. It receives only the selected course ID, ranked `RetrievedChunk`
-objects, and a calibration artifact. On `allow`, it preserves the retrieved
-chunks and their full provenance for a future generator. On `abstain`, it
-returns no evidence payload.
+objects, and a calibration artifact. It remains available for evaluation and
+comparison; M3-A Support Verification does not require its strict threshold.
 
 ## Calibration
 
@@ -31,6 +30,11 @@ ranked deterministically by:
 This makes false acceptance more costly than false abstention without silently
 hard-coding a threshold. It can still reveal poor separability; it is not an
 accuracy optimizer.
+
+On the checked-in deterministic corpus, the selected threshold was `0.782508`.
+Calibration allowed 2/14 answerable and 0/14 unsupported cases; holdout allowed
+0/6 answerable and 0/6 unsupported cases. The holdout all-abstain result is
+preserved as the reason similarity is not treated as final support verification.
 
 The runner also reports top-1/top-2/top-3 scores, top-1-minus-top-2 margins,
 counts, and min/max/mean/median/p10/p25/p75/p90 distributions for answerable

@@ -1,7 +1,8 @@
 # Vector indexing and retrieval
 
 Milestone 1-B converts SQLite chunks into vectors and returns ranked source
-chunks for one required course. It stops before evidence gating or generation.
+chunks for one required course. Retrieval itself stops before support
+verification or generation; M3-A consumes its `RetrievedChunk[]` output.
 
 ```text
 SQLite chunks -> EmbeddingProvider -> Qdrant
@@ -72,9 +73,9 @@ Query text is embedded in memory and is not written to SQLite or Qdrant.
 
 Results are ordered by Qdrant similarity score descending, then chunk ID for
 stable tie ordering. The score is returned unchanged as a vector similarity
-score. It is not a factual-confidence percentage. The separate Evidence Gate
-uses a provider-bound calibration artifact; raw scores are never globally
-portable.
+score. It is not a factual-confidence percentage. The M2-B Evidence Gate uses
+a provider-bound calibration artifact; raw scores are never globally portable.
+M3-A does not require that strict threshold before Support Verification.
 
 ## Current limitations
 
@@ -87,6 +88,8 @@ portable.
 - The M2-B gate is calibrated only on the synthetic corpus and deterministic
   provider; production calibration requires representative data and the chosen
   embedding provider.
+- Support Verification is an architecture and safety boundary, not a demonstrated
+  semantic-quality result until a live verifier is evaluated separately.
 - No answer generation, final citation formatting, or chat UI.
 
 ## Official API references

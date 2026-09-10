@@ -7,12 +7,15 @@ from course_rag_api.embeddings import DeterministicEmbeddingProvider
 from course_rag_api.evaluation import (
     EvaluationCase,
     EvidenceRef,
+    SupportConflictCase,
     load_evaluation_dataset,
     run_retrieval_evaluation,
     score_case,
+    summarize_support_verification,
     summarize_results,
 )
 from course_rag_api.models import RetrievedChunk
+from course_rag_api.support import SupportDecision, SupportStatus
 
 
 DATASET = Path(__file__).parents[2] / "examples/retrieval-evaluation/dataset.json"
@@ -182,6 +185,7 @@ def test_synthetic_dataset_runs_offline_and_never_returns_forbidden_course() -> 
     assert len(calibration_labels) == 28
     assert len(holdout_labels) == 12
     assert calibration_labels.isdisjoint(holdout_labels)
+    assert dataset.support_conflicts[0].label == "helios-pressure-conflict"
     assert all(case.answerable == bool(case.expected_evidence) for case in dataset.cases)
     assert first.case_count == len(dataset.cases)
     assert first.answerable_count > 0
@@ -205,3 +209,71 @@ def test_synthetic_dataset_runs_offline_and_never_returns_forbidden_course() -> 
         "contradictory-course isolation",
         "vocabulary-overlap isolation",
     } <= {case.category for case in dataset.cases}
+
+
+def test_support_verification_metrics_remain_separate_from_retrieval_metrics() -> None:
+    answerable = EvaluationCase(
+        label="answerable",
+        category="exact-answer",
+        course="orbital",
+        query="What is the coefficient?",
+        answerable=True,
+        expected_evidence=(EvidenceRef("alpha.md", 0, "section", 1, 1),),
+        forbidden_courses=("marine",),
+    )
+    unsupported = EvaluationCase(
+        label="unsupported",
+        category="wrong-attribute",
+        course="orbital",
+        query="Who discovered the coefficient?",
+        answerable=False,
+        expected_evidence=(),
+        forbidden_courses=("marine",),
+    )
+    decisions = {
+        "answerable": SupportDecision(
+            SupportStatus.SUPPORTED,
+            "explicit_support",
+            ("chunk-a",),
+            "scripted",
+            "test-v1",
+        ),
+        "unsupported": SupportDecision(
+            SupportStatus.INSUFFICIENT,
+            "missing_attribute",
+            (),
+            "scripted",
+            "test-v1",
+        ),
+    }
+
+    conflict = SupportConflictCase(
+        "helios-pressure-conflict",
+        "orbital",
+        "What is the Helios pressure?",
+        ("The Helios pressure is 81 kPa.", "The Helios pressure is 93 kPa."),
+        SupportStatus.CONFLICTING,
+    )
+    metrics = summarize_support_verification(
+        (answerable, unsupported),
+        decisions,
+        conflict_cases=(conflict,),
+        conflict_decisions={
+            conflict.label: SupportDecision(
+                SupportStatus.CONFLICTING,
+                "incompatible_candidate_answers",
+                ("chunk-a", "chunk-b"),
+                "scripted",
+                "test-v1",
+            )
+        },
+    )
+
+    assert metrics.supported_answerable == 1
+    assert metrics.missed_answerable == 0
+    assert metrics.incorrectly_supported_unsupported == 0
+    assert metrics.correctly_rejected_unsupported == 1
+    assert metrics.correctly_detected_conflicts == 1
+    assert metrics.answerable_support_rate == 1.0
+    assert metrics.unsupported_false_support_rate == 0.0
+    assert metrics.conflict_detection_rate == 1.0

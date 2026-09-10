@@ -49,8 +49,19 @@ right evidence was ranked; evidence sufficiency asks whether that evidence can
 support the requested factual claim. Those are separate decisions.
 
 The M2-B calibration command chooses a provider-bound baseline threshold from
-the calibration split and reports holdout results separately. See
+the calibration split and reports holdout results separately. Its current
+deterministic baseline reported holdout answerable acceptance of **0/6** and
+unsupported false accepts of **0/6**. This result is preserved rather than tuned
+away: similarity alone is not the final evidence-sufficiency decision. See
 [evidence gating](evidence-gating.md) for the objective and limitations.
+
+M3-A adds separate Support Verification metrics: supported answerable, missed
+answerable, incorrectly supported unsupported, correctly rejected unsupported,
+and correctly detected conflicts. These are not combined with Hit@k or Recall@k.
+The same 40 labels map answerable to `SUPPORTED` and unsupported to
+`INSUFFICIENT`; `support_conflicts` supplies a separate same-course conflict
+fixture. Live semantic metrics require a real verifier run and are not claimed
+by mocked tests.
 
 ## Run it
 
@@ -71,18 +82,18 @@ Representative deterministic-provider output:
 
 ```text
 Retrieval evaluation
-Cases: 8 (answerable=6, unsupported=2)
-Hit@1: 6/6 (1.000)
-Recall@1: 0.833
-Hit@3: 6/6 (1.000)
+Cases: 40 (answerable=20, unsupported=20)
+Hit@1: 20/20 (1.000)
+Recall@1: 0.875
+Hit@3: 20/20 (1.000)
 Recall@3: 1.000
-Hit@5: 6/6 (1.000)
+Hit@5: 20/20 (1.000)
 Recall@5: 1.000
 Isolation: PASS
 Unsupported top-1 scores:
-- unsupported-orbital-temperature: 0.205196
-- blueleaf-fertilizer-near-miss: 0.173422
-JSON: runtime/evaluations/m2a.json
+- comet-moss-tray-color: 0.780190
+- solar-vine-wavelength: 0.484200
+JSON: runtime/evaluations/m3a-retrieval.json
 ```
 
 The JSON artifact contains per-case raw scores, retrieved provenance, hits,

@@ -4,9 +4,9 @@
 
 This policy defines what CourseRAG may treat as evidence and how it must behave
 when answering questions about a selected course. It is normative for future
-retrieval and answer-generation work. Milestone 2-B adds a calibrated,
-provider-bound Evidence Gate for raw course-scoped evidence, but does not
-generate answers.
+retrieval and answer-generation work. Milestone 3-A adds an evidence Support
+Verifier after retrieval, while preserving the M2-B calibrated similarity gate
+as an experimental baseline. Neither component generates answers.
 
 ## Three distinct concepts
 
@@ -62,20 +62,24 @@ Strict grounding will be enforced in both of these ways:
 
 1. **Course-scoped vector retrieval (implemented):** Qdrant filters the selected
    course and SQLite validates provenance.
-2. **Calibrated Evidence Gate (implemented):** a provider-bound retrieval policy
-   permits or abstains without generating an answer.
-3. **Generator instructions (planned):** a future generator will receive only
+2. **Similarity-gate baseline (implemented):** a provider-bound M2-B threshold
+   remains available for evaluation and comparison; it is not a prerequisite for
+   M3-A support verification.
+3. **Support Verifier (implemented):** it receives only course-scoped retrieved
+   evidence and returns `SUPPORTED`, `INSUFFICIENT`, or `CONFLICTING` with
+   validated chunk bindings.
+4. **Generator instructions (planned):** a future generator will receive only
    approved evidence.
-4. **Citation/support validation (planned):** generated claims will be checked
+5. **Citation/support validation (planned):** generated claims will be checked
    against approved evidence.
 
 ### A. Procedurally in backend code
 
-Backend orchestration will require a selected course, retrieve with a
-storage-level course filter, verify every result's course ID, run an explicit
-evidence-sufficiency gate, and prevent provider invocation on the insufficient
-branch. It will then validate returned citations against the exact approved
-evidence set.
+Backend orchestration requires a selected course, retrieves with a storage-level
+course filter, validates every result's course ID and SQLite provenance, runs an
+explicit support verifier, and prevents future generation-provider invocation
+unless the result is `SUPPORTED`. It will then validate returned citations
+against the exact approved evidence set.
 
 This is the primary enforcement mechanism and must be covered by tests,
 including tests that assert the generation provider was not called.
@@ -94,11 +98,17 @@ deterministic backend code.
 
 ## Evidence-sufficiency policy
 
-The first top-1 retrieval policy is calibrated from an explicit synthetic split.
-Its threshold is provider-specific and is not factual confidence. Whatever
-future method is chosen must be deterministic at the
-orchestration boundary, testable without a live model, and conservative under
-ambiguity.
+Embedding similarity answers "How related is this retrieved text to the
+query?" It does not reliably answer "Does this text contain enough evidence to
+answer the query?" The M2-B top-1 experiment found overlap between answerable
+and unsupported scores, including zero answerable holdout allows at its strict
+threshold. The threshold remains a provider-specific baseline, not factual
+confidence or a mandatory M3-A gate.
+
+The Support Verifier evaluates the relationship between the actual question and
+the retrieved evidence. Its structured result is still untrusted until backend
+code validates its status and evidence bindings. Whatever future method is
+chosen must be testable without a live model and conservative under ambiguity.
 
 At minimum, evidence is insufficient when:
 

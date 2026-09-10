@@ -646,5 +646,17 @@
             "expected_evidence": [],
             "forbidden_courses": []
         }
+    ],
+    "support_conflicts": [
+        {
+            "label": "helios-pressure-conflict",
+            "course": "orbital-gardening",
+            "query": "What is the Helios pressure?",
+            "expected_status": "CONFLICTING",
+            "evidence": [
+                "The Helios pressure is 81 kPa.",
+                "The Helios pressure is 93 kPa."
+            ]
+        }
     ]
 }

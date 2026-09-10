@@ -28,6 +28,7 @@ from course_rag_api.ingestion import ingest_document
 from course_rag_api.models import IndexingSummary
 from course_rag_api.retrieval import Retriever
 from course_rag_api.storage import SQLiteStore
+from course_rag_api.support import SupportVerificationService, create_support_verifier
 from course_rag_api.vector_store import QdrantVectorIndex
 
 
@@ -62,6 +63,10 @@ def _parser() -> argparse.ArgumentParser:
     inspect.add_argument("--query", required=True)
     inspect.add_argument("--calibration", required=True, type=Path)
     inspect.add_argument("--limit", type=int, default=5)
+    verify_support = commands.add_parser("verify-support")
+    verify_support.add_argument("--course", required=True)
+    verify_support.add_argument("--query", required=True)
+    verify_support.add_argument("--limit", type=int, default=5)
     return parser
 
 
@@ -283,6 +288,38 @@ def main(argv: Sequence[str] | None = None) -> int:
                             f"{chunk.source_start}-{chunk.source_end}"
                         )
                         print(f"- {chunk.filename} {location} score={chunk.score:.6f}")
+                return 0
+            if args.command == "verify-support":
+                retriever = Retriever(store, index, provider)
+                results = retriever.retrieve(
+                    course_id=args.course, query=args.query, limit=args.limit
+                )
+                verifier = create_support_verifier(settings)
+                decision = SupportVerificationService(
+                    store, retriever, verifier, args.limit
+                ).verify_retrieved_evidence(
+                    course_id=args.course,
+                    question=args.query,
+                    evidence=results,
+                )
+                print(f"Decision: {decision.status.value}")
+                print(f"Reason: {decision.reason}")
+                print(
+                    f"Verifier: {decision.verifier_provider} / "
+                    f"{decision.verifier_model}"
+                )
+                if results:
+                    print("Retrieved evidence:")
+                    for result in results:
+                        print(
+                            f"- {result.filename} {result.source_type} "
+                            f"{result.source_start}-{result.source_end} "
+                            f"score={result.score:.6f} chunk_id={result.chunk_id}"
+                        )
+                if decision.supporting_chunk_ids:
+                    print("Supporting evidence:")
+                    for chunk_id in decision.supporting_chunk_ids:
+                        print(f"- chunk_id={chunk_id}")
                 return 0
             results = Retriever(store, index, provider).retrieve(
                 course_id=args.course, query=args.query, limit=args.limit
