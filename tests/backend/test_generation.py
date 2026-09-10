@@ -31,12 +31,14 @@ class ScriptedVerifier:
     provider_name = "scripted"
     model_name = "support-test-v1"
 
-    def __init__(self, decision: SupportDecision) -> None:
+    def __init__(self, decision: SupportDecision | Exception) -> None:
         self.decision = decision
         self.calls = 0
 
     def verify(self, **_: object) -> SupportDecision:
         self.calls += 1
+        if isinstance(self.decision, Exception):
+            raise self.decision
         return self.decision
 
 
@@ -162,6 +164,33 @@ def test_generation_runs_only_for_supported_evidence_and_returns_citations(
     assert generator.evidence == (chunks[0],)
 
 
+def test_supported_evidence_reaches_generation_below_m2b_threshold(tmp_path) -> None:
+    store, course_id, chunks = _stored_chunks(tmp_path)
+    below_baseline = (replace(chunks[0], score=0.7),)
+    verifier = ScriptedVerifier(
+        SupportDecision(
+            SupportStatus.SUPPORTED,
+            "explicit_support",
+            ("chunk-0",),
+            "scripted",
+            "support-test-v1",
+        )
+    )
+    generator = ScriptedGenerator(_answer("chunk-0"))
+    service = AnswerGenerationService(
+        SupportVerificationService(store, StaticRetriever(below_baseline), verifier),
+        generator,
+    )
+
+    response = service.answer_question(
+        course_id=course_id, question="What is the coefficient?"
+    )
+
+    assert below_baseline[0].score < 0.782508
+    assert response.status is FinalStatus.ANSWERED
+    assert generator.calls == 1
+
+
 @pytest.mark.parametrize(
     ("status", "reason", "has_evidence"),
     [
@@ -194,6 +223,27 @@ def test_non_supported_or_empty_evidence_never_calls_generator(
 
     assert response.status is FinalStatus.ABSTAINED
     assert response.answer is None
+    assert generator.calls == 0
+
+
+def test_verifier_error_never_calls_generator(tmp_path) -> None:
+    store, course_id, chunks = _stored_chunks(tmp_path)
+    generator = ScriptedGenerator(_answer("chunk-0"))
+    service = AnswerGenerationService(
+        SupportVerificationService(
+            store, StaticRetriever(chunks), ScriptedVerifier(RuntimeError("offline"))
+        ),
+        generator,
+    )
+
+    response = service.answer_question(
+        course_id=course_id, question="What is the coefficient?"
+    )
+
+    assert (response.status, response.reason) == (
+        FinalStatus.ABSTAINED,
+        "verifier_error",
+    )
     assert generator.calls == 0
 
 
