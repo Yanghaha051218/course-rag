@@ -4,12 +4,19 @@ from pathlib import Path
 import pytest
 from qdrant_client import QdrantClient
 
-from course_rag_api.benchmark import load_benchmark_dataset, run_benchmark
+from course_rag_api.benchmark import (
+    BenchmarkCase,
+    BenchmarkSource,
+    _retrieval_result,
+    load_benchmark_dataset,
+    run_benchmark,
+)
 from course_rag_api.embeddings import DeterministicEmbeddingProvider
 from course_rag_api.generation import GeneratedAnswer, GeneratedClaim
 from course_rag_api.indexing import IndexingService
 from course_rag_api.ingestion import ingest_document
 from course_rag_api.retrieval import Retriever
+from course_rag_api.models import RetrievedChunk
 from course_rag_api.storage import SQLiteStore
 from course_rag_api.support import SupportDecision, SupportStatus, SupportVerificationService
 from course_rag_api.vector_store import QdrantVectorIndex
@@ -44,6 +51,45 @@ def _source(document: str, start: int = 1) -> dict[str, object]:
         "start": start,
         "end": start,
     }
+
+
+def _retrieved(document: str, start: int) -> RetrievedChunk:
+    return RetrievedChunk(
+        chunk_id=f"{document}-{start}",
+        course_id="course",
+        document_id=document,
+        filename=document,
+        text="fixture",
+        score=1.0,
+        chunk_index=0,
+        source_type="section",
+        source_start=start,
+        source_end=start,
+    )
+
+
+def test_full_evidence_metric_distinguishes_partial_and_complete_retrieval() -> None:
+    sources = (
+        BenchmarkSource("first.md", "section", 1, 1),
+        BenchmarkSource("second.md", "section", 1, 1),
+    )
+    case = BenchmarkCase("multi", "course", "Question?", "answerable", "multi_document", sources)
+    hit, recall, full_evidence, _, _ = _retrieval_result(
+        case,
+        (_retrieved("first.md", 1), _retrieved("other.md", 1), _retrieved("second.md", 1)),
+    )
+
+    assert hit[1] is True
+    assert recall[1] == 0.5
+    assert full_evidence[1] is False
+    assert hit[3] is True
+    assert recall[3] == 1.0
+    assert full_evidence[3] is True
+
+    single = BenchmarkCase("single", "course", "Question?", "answerable", "direct_factual", sources[:1])
+    _, _, single_full_evidence, _, _ = _retrieval_result(single, (_retrieved("first.md", 1),))
+
+    assert single_full_evidence[1] is True
 
 
 def _load(tmp_path: Path, payload: dict[str, object]):

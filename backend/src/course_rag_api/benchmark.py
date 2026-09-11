@@ -94,6 +94,7 @@ class BenchmarkCaseResult:
     category: str
     retrieval_hit_at: dict[int, bool]
     retrieval_recall_at: dict[int, float | None]
+    retrieval_full_evidence_at: dict[int, bool]
     reciprocal_rank: float | None
     retrieved: tuple[RetrievedSource, ...]
     support_status: str | None
@@ -106,6 +107,7 @@ class BenchmarkCaseResult:
 class BenchmarkMetrics:
     retrieval_hit_at: dict[int, float]
     retrieval_recall_at: dict[int, float]
+    retrieval_full_evidence_at: dict[int, float]
     retrieval_mrr: float
     support_accept_rate: float | None
     false_support_rate: float | None
@@ -138,6 +140,9 @@ def format_benchmark_report(report: BenchmarkReport) -> str:
     for k in _K_VALUES:
         lines.append(f"Hit@{k}: {report.metrics.retrieval_hit_at[k]:.3f}")
         lines.append(f"Recall@{k}: {report.metrics.retrieval_recall_at[k]:.3f}")
+        lines.append(
+            f"FullEvidence@{k}: {report.metrics.retrieval_full_evidence_at[k]:.3f}"
+        )
     lines.append(f"MRR: {report.metrics.retrieval_mrr:.3f}")
     for label, value in (
         ("Support accept", report.metrics.support_accept_rate),
@@ -255,7 +260,11 @@ def load_benchmark_dataset(path: Path) -> BenchmarkDataset:
 
 
 def _retrieval_result(case: BenchmarkCase, chunks: Sequence[RetrievedChunk]) -> tuple[
-    dict[int, bool], dict[int, float | None], float | None, tuple[RetrievedSource, ...]
+    dict[int, bool],
+    dict[int, float | None],
+    dict[int, bool],
+    float | None,
+    tuple[RetrievedSource, ...],
 ]:
     ranks = {
         source: rank
@@ -275,6 +284,12 @@ def _retrieval_result(case: BenchmarkCase, chunks: Sequence[RetrievedChunk]) -> 
         )
         for k in _K_VALUES
     }
+    full_evidence = {
+        k: bool(case.expected_sources) and all(
+            rank <= k for rank in ranks.values()
+        )
+        for k in _K_VALUES
+    }
     reciprocal_rank = 1 / min(ranks.values()) if ranks else None
     retrieved = tuple(
         RetrievedSource(
@@ -288,7 +303,7 @@ def _retrieval_result(case: BenchmarkCase, chunks: Sequence[RetrievedChunk]) -> 
         )
         for rank, chunk in enumerate(chunks, start=1)
     )
-    return hit, recall, reciprocal_rank, retrieved
+    return hit, recall, full_evidence, reciprocal_rank, retrieved
 
 
 def _expected_support(case: BenchmarkCase) -> SupportStatus:
@@ -322,6 +337,13 @@ def _metrics(results: Sequence[BenchmarkCaseResult]) -> BenchmarkMetrics:
         },
         retrieval_recall_at={
             k: sum(float(result.retrieval_recall_at[k]) for result in evidence_cases)
+            / len(evidence_cases)
+            if evidence_cases
+            else 0.0
+            for k in _K_VALUES
+        },
+        retrieval_full_evidence_at={
+            k: sum(result.retrieval_full_evidence_at[k] for result in evidence_cases)
             / len(evidence_cases)
             if evidence_cases
             else 0.0
@@ -382,7 +404,9 @@ def run_benchmark(
     results: list[BenchmarkCaseResult] = []
     for case in dataset.cases:
         chunks = retriever.retrieve(course_id=course_id, query=case.question, limit=limit)
-        hit, recall, reciprocal_rank, retrieved = _retrieval_result(case, chunks)
+        hit, recall, full_evidence, reciprocal_rank, retrieved = _retrieval_result(
+            case, chunks
+        )
         failures: list[BenchmarkFailure] = []
         if case.expected_sources and recall[5] != 1.0:
             failures.append(BenchmarkFailure("retrieval_failure", "expected source was not retrieved"))
@@ -429,6 +453,7 @@ def run_benchmark(
                 case.category,
                 hit,
                 recall,
+                full_evidence,
                 reciprocal_rank,
                 retrieved,
                 decision.status.value if decision else None,

@@ -76,7 +76,13 @@ Retrieval is evaluated only on cases with expected evidence:
 
 - **Hit@1/3/5:** at least one expected locator appears by that rank.
 - **Recall@1/3/5:** fraction of expected locators found by that rank.
+- **FullEvidence@1/3/5:** all expected locators appear by that rank.
 - **MRR:** reciprocal rank of the first expected locator, averaged over cases.
+
+Hit measures whether retrieval found any relevant evidence. Recall measures how
+much of the annotated evidence set it found. FullEvidence is especially useful
+for multi-region questions: it is zero until every required locator is present,
+even if Hit is already one.
 
 When enabled, support metrics are separate:
 
