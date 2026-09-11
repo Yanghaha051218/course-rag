@@ -1,5 +1,7 @@
+import pytest
 from course_rag_api.config import Settings
-from course_rag_api.embeddings import OpenAIEmbeddingProvider, create_embedding_provider
+from course_rag_api.embeddings import FastEmbedEmbeddingProvider, OpenAIEmbeddingProvider, create_embedding_provider
+from pydantic import ValidationError
 from course_rag_api.support import OpenAISupportVerifier, create_support_verifier
 from course_rag_api.generation import OpenAIGenerator, create_generator
 
@@ -27,6 +29,34 @@ def test_openai_provider_selection_uses_openai_defaults() -> None:
     assert isinstance(provider, OpenAIEmbeddingProvider)
     assert provider.model_name == "text-embedding-3-small"
     assert provider.dimension == 1536
+
+
+def test_fastembed_provider_selection_uses_configured_model(monkeypatch) -> None:
+    class FakeFastEmbedProvider:
+        expected_dimension = 384
+
+        def __init__(self, *, model_name, cache_dir):
+            self.model_name = model_name
+            self.cache_dir = cache_dir
+
+    monkeypatch.setattr(
+        "course_rag_api.embeddings.FastEmbedEmbeddingProvider", FakeFastEmbedProvider
+    )
+    settings = Settings(
+        _env_file=None,
+        embedding_provider="fastembed",
+        fastembed_model="BAAI/bge-small-en-v1.5",
+    )
+
+    provider = create_embedding_provider(settings)
+
+    assert isinstance(provider, FakeFastEmbedProvider)
+    assert provider.model_name == "BAAI/bge-small-en-v1.5"
+
+
+def test_invalid_embedding_provider_fails_configuration_validation() -> None:
+    with pytest.raises(ValidationError, match="embedding_provider"):
+        Settings(_env_file=None, embedding_provider="unknown")
 
 
 def test_openai_verifier_selection_uses_configured_model() -> None:

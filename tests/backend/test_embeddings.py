@@ -4,6 +4,7 @@ import pytest
 
 from course_rag_api.embeddings import (
     DeterministicEmbeddingProvider,
+    FastEmbedEmbeddingProvider,
     OpenAIEmbeddingProvider,
 )
 from course_rag_api.errors import ConfigurationError, EmbeddingError
@@ -118,3 +119,57 @@ def test_openai_provider_surfaces_sdk_failure_without_network() -> None:
 
     with pytest.raises(EmbeddingError, match="request failed"):
         provider.embed_query("query")
+
+
+def test_fastembed_provider_uses_mocked_batch_and_query_boundaries() -> None:
+    class FakeModel:
+        embedding_size = 384
+
+        def embed(self, texts):
+            assert texts == ["first", "second"]
+            return iter(([1.0] + [0.0] * 383, [0.0, 1.0] + [0.0] * 382))
+
+        def query_embed(self, text):
+            assert text == "query"
+            return iter(([0.0, 0.0, 1.0] + [0.0] * 381,))
+
+    provider = FastEmbedEmbeddingProvider(
+        model_name="BAAI/bge-small-en-v1.5", cache_dir="runtime/models/fastembed", model=FakeModel()
+    )
+
+    assert provider.provider_name == "fastembed"
+    assert provider.model_name == "BAAI/bge-small-en-v1.5"
+    assert provider.dimension == 384
+    assert provider.embed_documents(["first", "second"])[1][1] == 1.0
+    assert provider.embed_query("query")[2] == 1.0
+
+
+@pytest.mark.parametrize(
+    ("vectors", "error"),
+    [([[1.0] * 384], "number"), ([[1.0] * 383, [1.0] * 383], "dimension")],
+)
+def test_fastembed_provider_rejects_invalid_model_output(vectors, error: str) -> None:
+    class FakeModel:
+        embedding_size = 384
+
+        def embed(self, _):
+            return iter(vectors)
+
+        def query_embed(self, _):
+            return iter(vectors[:1])
+
+    provider = FastEmbedEmbeddingProvider(
+        model_name="BAAI/bge-small-en-v1.5", cache_dir="runtime/models/fastembed", model=FakeModel()
+    )
+
+    with pytest.raises(EmbeddingError, match=error):
+        provider.embed_documents(["first", "second"])
+
+
+def test_fastembed_provider_rejects_an_unexpected_model_dimension() -> None:
+    provider_model = SimpleNamespace(embedding_size=383)
+
+    with pytest.raises(ConfigurationError, match="384"):
+        FastEmbedEmbeddingProvider(
+            model_name="BAAI/bge-small-en-v1.5", cache_dir="runtime/models/fastembed", model=provider_model
+        )

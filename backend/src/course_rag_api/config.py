@@ -20,9 +20,11 @@ class Settings(BaseSettings):
     database_path: Path = Path("runtime/db/course-rag.sqlite3")
     qdrant_path: Path = Path("runtime/qdrant")
     qdrant_collection_prefix: str = Field(default="course_rag", min_length=1)
-    embedding_provider: Literal["deterministic", "openai"] = "deterministic"
+    embedding_provider: Literal["deterministic", "fastembed", "openai"] = "deterministic"
     embedding_model: str | None = Field(default=None, min_length=1)
     embedding_dimension: int | None = Field(default=None, gt=0)
+    fastembed_model: str = Field(default="BAAI/bge-small-en-v1.5", min_length=1)
+    fastembed_cache_dir: Path = Path("runtime/models/fastembed")
     embedding_batch_size: int = Field(default=64, gt=0)
     verifier_provider: Literal["openai"] = "openai"
     verifier_model: str = Field(default="gpt-4o-mini", min_length=1)

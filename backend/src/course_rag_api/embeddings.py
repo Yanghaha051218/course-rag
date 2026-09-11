@@ -63,6 +63,74 @@ class DeterministicEmbeddingProvider:
         return self._embed(text)
 
 
+class FastEmbedEmbeddingProvider:
+    """Local semantic embeddings loaded only when this provider is selected."""
+
+    provider_name = "fastembed"
+    expected_model = "BAAI/bge-small-en-v1.5"
+    expected_dimension = 384
+
+    def __init__(
+        self, *, model_name: str, cache_dir: str, model: object | None = None
+    ) -> None:
+        if model_name != self.expected_model:
+            raise ConfigurationError(
+                f"FastEmbed model must be {self.expected_model} for M4-A.3"
+            )
+        self.model_name = model_name
+        if model is None:
+            try:
+                from fastembed import TextEmbedding
+
+                model = TextEmbedding(model_name=model_name, cache_dir=cache_dir)
+            except ImportError as error:
+                raise ConfigurationError("fastembed must be installed to use this provider") from error
+            except Exception as error:
+                raise ConfigurationError("FastEmbed model initialization failed") from error
+        dimension = getattr(model, "embedding_size", None)
+        if callable(dimension):
+            dimension = dimension()
+        if dimension != self.expected_dimension:
+            raise ConfigurationError(
+                f"FastEmbed model must report {self.expected_dimension} dimensions"
+            )
+        self.dimension = dimension
+        self._model = model
+
+    def _vectors(self, vectors: object, expected_count: int) -> list[list[float]]:
+        try:
+            result = [[float(value) for value in vector] for vector in vectors]
+        except (TypeError, ValueError) as error:
+            raise EmbeddingError("FastEmbed returned invalid embeddings") from error
+        if len(result) != expected_count:
+            raise EmbeddingError("FastEmbed returned an unexpected number of embeddings")
+        if any(len(vector) != self.dimension for vector in result):
+            raise EmbeddingError("FastEmbed returned an unexpected embedding dimension")
+        return result
+
+    def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        if any(not text.strip() for text in texts):
+            raise EmbeddingError("embedding input must not be empty")
+        try:
+            return self._vectors(self._model.embed(list(texts)), len(texts))
+        except EmbeddingError:
+            raise
+        except Exception as error:
+            raise EmbeddingError("FastEmbed embedding request failed") from error
+
+    def embed_query(self, text: str) -> list[float]:
+        if not text.strip():
+            raise EmbeddingError("embedding input must not be empty")
+        try:
+            return self._vectors(self._model.query_embed(text), 1)[0]
+        except EmbeddingError:
+            raise
+        except Exception as error:
+            raise EmbeddingError("FastEmbed query embedding failed") from error
+
+
 class OpenAIEmbeddingProvider:
     provider_name = "openai"
 
@@ -124,6 +192,15 @@ def create_embedding_provider(settings: Settings) -> EmbeddingProvider:
                 "deterministic provider model must be deterministic-hash-v1"
             )
         return DeterministicEmbeddingProvider(settings.embedding_dimension or 256)
+    if settings.embedding_provider == "fastembed":
+        if settings.embedding_model is not None:
+            raise ConfigurationError("use COURSE_RAG_FASTEMBED_MODEL for FastEmbed")
+        if settings.embedding_dimension not in (None, FastEmbedEmbeddingProvider.expected_dimension):
+            raise ConfigurationError("FastEmbed embedding dimension must be 384")
+        return FastEmbedEmbeddingProvider(
+            model_name=settings.fastembed_model,
+            cache_dir=str(settings.fastembed_cache_dir),
+        )
     return OpenAIEmbeddingProvider(
         api_key=(
             settings.openai_api_key.get_secret_value()

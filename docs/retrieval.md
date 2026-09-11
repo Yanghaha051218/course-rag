@@ -35,6 +35,21 @@ No provider performs an API request at import time. When OpenAI is selected,
 document chunk text and query text are sent to OpenAI for embedding. Automated
 tests use a fake client and never send document text over the network.
 
+FastEmbed is the first local semantic retrieval option. Select the explicitly
+supported `BAAI/bge-small-en-v1.5` model with:
+
+```text
+COURSE_RAG_EMBEDDING_PROVIDER=fastembed
+COURSE_RAG_FASTEMBED_MODEL=BAAI/bge-small-en-v1.5
+COURSE_RAG_FASTEMBED_CACHE_DIR=runtime/models/fastembed
+```
+
+The first use downloads model files to the ignored cache directory. Afterwards,
+embedding runs locally and course chunk text is not sent to an embedding API.
+FastEmbed is a meaningful local semantic baseline, not a claim that it is the
+best production embedding model. The deterministic hash provider remains for
+offline deterministic unit tests, not semantic-quality evaluation.
+
 ## Qdrant design
 
 Local development uses persistent Qdrant storage at `runtime/qdrant/`; tests use

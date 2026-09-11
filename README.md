@@ -42,8 +42,8 @@ instructions. Prompting alone is not considered an enforcement boundary. See
 - **Application metadata:** SQLite for courses, documents, and chunks.
 - **Vector storage:** local Qdrant collections with mandatory course filters.
 - **Document formats:** PDF, PPTX, DOCX, Markdown, and text are ingestible.
-- **Embeddings:** deterministic offline and OpenAI providers behind one small
-  interface.
+- **Embeddings:** deterministic test, local FastEmbed semantic, and OpenAI
+  providers behind one small interface.
 - **Generation (implemented service):** an OpenAI Responses API provider accepts
   only `SUPPORTED` evidence chunks and returns strict structured claims.
 - **Similarity-gate baseline (implemented):** a provider-bound M2-B threshold
@@ -60,7 +60,8 @@ The fuller component and data-flow design is in
 - PDF page, PPTX slide, DOCX paragraph, Markdown, and text parsing.
 - Deterministic word-budget chunking with overlap and source ranges.
 - Transactional SQLite persistence and same-course duplicate detection.
-- Deterministic offline embeddings and an OpenAI embedding provider.
+- Deterministic offline embeddings, a local FastEmbed semantic provider, and
+  an OpenAI embedding provider.
 - Idempotent Qdrant vector indexing with stable chunk UUIDs.
 - Required-course retrieval returning ranked, provenance-preserving chunks.
 - Offline retrieval evaluation with Hit@k, Recall@k, raw-score collection, and
@@ -156,9 +157,12 @@ Run all commands from the repository root unless a step says otherwise.
 
    Open `http://127.0.0.1:3000`.
 
-No API key is required for the default deterministic provider. To use OpenAI
-embeddings, set `COURSE_RAG_EMBEDDING_PROVIDER=openai` and supply
-`OPENAI_API_KEY`; never commit the populated file.
+No API key is required for the default deterministic provider. For local
+semantic retrieval, set `COURSE_RAG_EMBEDDING_PROVIDER=fastembed`; its first
+use downloads `BAAI/bge-small-en-v1.5` into ignored `runtime/models/fastembed/`
+and processes course text locally. To use OpenAI embeddings instead, set
+`COURSE_RAG_EMBEDDING_PROVIDER=openai` and supply `OPENAI_API_KEY`; never
+commit the populated file.
 
 ## Ingest documents locally
 
@@ -286,7 +290,8 @@ provider is selected, document chunk text and query text are sent to OpenAI for
 embedding. When the OpenAI support verifier is selected, the question and only
 the retrieved evidence text/provenance for the selected course are sent to
 OpenAI. When the OpenAI generator is selected, it receives the question and
-only the specific chunks bound by a `SUPPORTED` verifier decision. The
+only the specific chunks bound by a `SUPPORTED` verifier decision. FastEmbed
+downloads its model on first use, then processes embedding inputs locally. The
 deterministic embedding provider stays local and exists only for reproducible
 development and testing.
 

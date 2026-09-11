@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from qdrant_client import QdrantClient, models
 
-from course_rag_api.embeddings import DeterministicEmbeddingProvider
+from course_rag_api.embeddings import DeterministicEmbeddingProvider, FastEmbedEmbeddingProvider
 from course_rag_api.errors import (
     CourseNotFoundError,
     IndexCompatibilityError,
@@ -217,6 +217,64 @@ def test_embedding_identity_selects_a_different_collection(tmp_path: Path) -> No
     )
 
     assert small.collection_name != large.collection_name
+
+
+def test_fastembed_uses_a_separate_collection_with_stable_chunk_ids(tmp_path: Path) -> None:
+    class FakeFastEmbedModel:
+        embedding_size = 384
+
+        def embed(self, texts):
+            return iter([[1.0] * 384 for _ in texts])
+
+        def query_embed(self, text):
+            del text
+            return iter([[1.0] * 384])
+
+    store = SQLiteStore(tmp_path / "metadata.sqlite3")
+    course = store.create_course("Semantic test course")
+    document = tmp_path / "notes.md"
+    document.write_text("A semantic retrieval fixture.", encoding="utf-8")
+    ingest_document(
+        store=store,
+        course_id=course.id,
+        file_path=document,
+        chunk_target_size=50,
+        chunk_overlap=5,
+        max_document_bytes=10_000,
+    )
+    foreign_course = store.create_course("Foreign semantic test course")
+    foreign_document = tmp_path / "foreign.md"
+    foreign_document.write_text("A foreign semantic retrieval fixture.", encoding="utf-8")
+    ingest_document(
+        store=store,
+        course_id=foreign_course.id,
+        file_path=foreign_document,
+        chunk_target_size=50,
+        chunk_overlap=5,
+        max_document_bytes=10_000,
+    )
+    client = QdrantClient(location=":memory:")
+    deterministic = DeterministicEmbeddingProvider(dimension=64)
+    fastembed = FastEmbedEmbeddingProvider(
+        model_name="BAAI/bge-small-en-v1.5", cache_dir="runtime/models/fastembed", model=FakeFastEmbedModel()
+    )
+    deterministic_index = QdrantVectorIndex(client, "course_rag_test", deterministic)
+    fastembed_index = QdrantVectorIndex(client, "course_rag_test", fastembed)
+
+    IndexingService(store, deterministic_index, deterministic).index_course(course.id)
+    IndexingService(store, fastembed_index, fastembed).index_course(course.id)
+    IndexingService(store, fastembed_index, fastembed).index_course(foreign_course.id)
+    chunk_ids = [chunk.id for chunk in store.list_chunks(course.id)]
+
+    assert deterministic_index.collection_name != fastembed_index.collection_name
+    assert deterministic_index.missing_chunk_ids(chunk_ids) == set()
+    assert fastembed_index.missing_chunk_ids(chunk_ids) == set()
+    assert {
+        chunk.course_id
+        for chunk in Retriever(store, fastembed_index, fastembed).retrieve(
+            course_id=course.id, query="fixture"
+        )
+    } == {course.id}
 
 
 def test_missing_sqlite_chunk_fails_loudly(tmp_path: Path) -> None:
