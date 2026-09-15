@@ -9,7 +9,13 @@ description = "FastAPI backend for CourseRAG"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi==0.141.1",
+  "fastembed==0.8.0",
+  "openai==3.8.0",
+  "pymupdf==1.28.2",
   "pydantic-settings==2.15.0",
+  "python-docx==1.2.0",
+  "python-pptx==1.0.2",
+  "qdrant-client==1.19.0",
   "uvicorn[standard]==0.52.4",
 ]
 
@@ -18,6 +24,9 @@ test = [
   "httpx2==2.12.0",
   "pytest==9.1.1",
 ]
+
+[project.scripts]
+course-rag = "course_rag_api.cli:main"
 
 [tool.pytest.ini_options]
 addopts = "-ra"

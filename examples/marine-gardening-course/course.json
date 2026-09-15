@@ -1,0 +1,8 @@
+{
+  "id": "synthetic-marine-gardening",
+  "title": "Marine Gardening",
+  "description": "Original contradictory fixture for course-isolation tests.",
+  "materials": [
+    "materials/marine-gardening.md"
+  ]
+}

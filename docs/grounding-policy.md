@@ -4,8 +4,9 @@
 
 This policy defines what CourseRAG may treat as evidence and how it must behave
 when answering questions about a selected course. It is normative for future
-retrieval and answer-generation work; Milestone 0 establishes the policy but
-does not yet implement the RAG path.
+retrieval and answer-generation work. Milestone 3-B adds a grounded-generation
+service after the evidence Support Verifier, while preserving the M2-B
+calibrated similarity gate as an experimental baseline.
 
 ## Three distinct concepts
 
@@ -46,12 +47,11 @@ unsupported factual source.
 2. Citations must identify evidence that was actually retrieved and approved for
    that request; the model may not invent document names, chunk IDs, or locators.
 3. If evidence is missing, too weak, contradictory without resolution, or does
-   not cover the asked claim, the system must return an explicit
-   `insufficient_evidence` response.
+   not cover the asked claim, the system must return an explicit abstention.
 4. When evidence is insufficient, backend code must stop the workflow before any
    generation-provider call.
-5. Operational failures are errors, not evidence insufficiency, and must not be
-   silently converted into an answer or abstention.
+5. Generation and citation-validation failures must fail closed without exposing
+   raw model output.
 6. Evidence from any course other than the selected course is forbidden, even if
    it would answer the question correctly.
 
@@ -59,22 +59,35 @@ unsupported factual source.
 
 Strict grounding will be enforced in both of these ways:
 
+1. **Course-scoped vector retrieval (implemented):** Qdrant filters the selected
+   course and SQLite validates provenance.
+2. **Similarity-gate baseline (implemented):** a provider-bound M2-B threshold
+   remains available for evaluation and comparison; it is not a prerequisite for
+   M3-A support verification.
+3. **Support Verifier (implemented):** it receives only course-scoped retrieved
+   evidence and returns `SUPPORTED`, `INSUFFICIENT`, or `CONFLICTING` with
+   validated chunk bindings.
+4. **Generator boundary (implemented):** the generator receives only chunks
+   explicitly bound by a validated `SUPPORTED` decision.
+5. **Citation/support validation (implemented):** generated claim bindings are
+   checked against that exact approved evidence set.
+
 ### A. Procedurally in backend code
 
-Backend orchestration will require a selected course, retrieve with a
-storage-level course filter, verify every result's course ID, run an explicit
-evidence-sufficiency gate, and prevent provider invocation on the insufficient
-branch. It will then validate returned citations against the exact approved
-evidence set.
+Backend orchestration requires a selected course, retrieves with a storage-level
+course filter, validates every result's course ID and SQLite provenance, runs an
+explicit support verifier, and prevents generation-provider invocation unless
+the result is `SUPPORTED`. It then passes only the verifier-bound chunks to the
+generator and validates every returned claim binding against that exact approved
+evidence set before returning `ANSWERED`.
 
 This is the primary enforcement mechanism and must be covered by tests,
 including tests that assert the generation provider was not called.
 
 ### B. Through model instructions
 
-When generation is permitted, the model will be instructed to use only the
-provided evidence, attach citations, avoid unsupported claims, and state when a
-requested detail is not present.
+When generation is permitted, the model is instructed to use only the provided
+evidence, attach claim bindings, and avoid unsupported claims.
 
 Model instructions are defense in depth. **Prompting alone is not sufficient
 enforcement.** Models can misunderstand instructions, be influenced by prompt
@@ -84,9 +97,17 @@ deterministic backend code.
 
 ## Evidence-sufficiency policy
 
-The concrete scoring and thresholds will be specified with the retrieval
-milestone. Whatever method is chosen must be deterministic at the orchestration
-boundary, testable without a live model, and conservative under ambiguity.
+Embedding similarity answers "How related is this retrieved text to the
+query?" It does not reliably answer "Does this text contain enough evidence to
+answer the query?" The M2-B top-1 experiment found overlap between answerable
+and unsupported scores, including zero answerable holdout allows at its strict
+threshold. The threshold remains a provider-specific baseline, not factual
+confidence or a mandatory M3-A gate.
+
+The Support Verifier evaluates the relationship between the actual question and
+the retrieved evidence. Its structured result is still untrusted until backend
+code validates its status and evidence bindings. Whatever future method is
+chosen must be testable without a live model and conservative under ambiguity.
 
 At minimum, evidence is insufficient when:
 
