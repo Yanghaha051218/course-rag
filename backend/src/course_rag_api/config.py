@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     )
     database_path: Path = Path("runtime/db/course-rag.sqlite3")
     qdrant_path: Path = Path("runtime/qdrant")
+    upload_path: Path = Path("runtime/uploads")
     qdrant_collection_prefix: str = Field(default="course_rag", min_length=1)
     embedding_provider: Literal["deterministic", "fastembed", "openai"] = "deterministic"
     embedding_model: str | None = Field(default=None, min_length=1)

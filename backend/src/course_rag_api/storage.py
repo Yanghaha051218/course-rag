@@ -91,6 +91,13 @@ class SQLiteStore:
             raise CourseNotFoundError(f"Course does not exist: {course_id}")
         return Course(**dict(row))
 
+    def list_courses(self) -> tuple[Course, ...]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT id, name, created_at FROM courses ORDER BY created_at, id"
+            ).fetchall()
+        return tuple(Course(**dict(row)) for row in rows)
+
     def find_document_by_checksum(
         self, course_id: str, checksum: str
     ) -> Document | None:

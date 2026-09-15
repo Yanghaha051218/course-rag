@@ -8,15 +8,20 @@ abstain instead of filling gaps with a model's pretrained knowledge.
 
 ## Status
 
-**Early development — Milestone 4-A.**
+**Early development — Milestone 4-B local product prototype.**
 
 The repository now implements local document ingestion, source-aware parsing,
 deterministic chunking, SQLite metadata persistence, embedding providers,
 Qdrant indexing, course-scoped vector retrieval, deterministic retrieval
 evaluation, the M2-B similarity-gate baseline, evidence support verification,
 and a backend grounded-generation service. A local real-course benchmark runner
-now measures those stages without committing course materials. No
-question-answering HTTP endpoint or chat UI exists yet.
+measures those stages without committing course materials. The repository also
+has a minimal local workflow for creating a course, uploading documents, asking
+questions, and viewing grounded answers or abstentions with citations.
+
+The SupportVerifier has human-reviewed gold datasets, but its live semantic
+evaluation is still pending. Do not expose this prototype publicly: it has no
+authentication or multi-user access controls.
 
 ## Grounding principle
 
@@ -54,7 +59,7 @@ instructions. Prompting alone is not considered an enforcement boundary. See
 The fuller component and data-flow design is in
 [docs/architecture.md](docs/architecture.md).
 
-## Implemented through Milestone 3-B
+## Implemented
 
 - Course creation and course-owned document metadata.
 - PDF page, PPTX slide, DOCX paragraph, Markdown, and text parsing.
@@ -76,12 +81,13 @@ The fuller component and data-flow design is in
 - Local benchmark runner with separate retrieval, support, citation, and
   failure-analysis metrics for human-curated course questions.
 - Developer-facing ingestion CLI.
+- Local course, document-upload, and question-answering HTTP endpoints.
+- Minimal responsive Next.js interface for the end-to-end local workflow.
 
 ## Planned features
 
-- A question-answering HTTP endpoint and frontend flow for the grounded service.
 - Additional embedding and generation providers.
-- Chat interfaces.
+- Authentication, deployment hardening, and conversation history.
 
 These are roadmap items, not claims about the current implementation.
 
@@ -157,7 +163,10 @@ Run all commands from the repository root unless a step says otherwise.
 
    Open `http://127.0.0.1:3000`.
 
-No API key is required for the default deterministic provider. For local
+No API key is required for document ingestion or the default deterministic
+embedding provider. Answer generation and semantic support verification require
+a configured OpenAI key with available API credit; provider failures fail closed
+instead of producing an ungrounded answer. For local
 semantic retrieval, set `COURSE_RAG_EMBEDDING_PROVIDER=fastembed`; its first
 use downloads `BAAI/bge-small-en-v1.5` into ignored `runtime/models/fastembed/`
 and processes course text locally. To use OpenAI embeddings instead, set
