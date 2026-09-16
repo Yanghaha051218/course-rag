@@ -3,18 +3,15 @@
 import { FormEvent, useEffect, useState } from "react";
 
 type Course = { id: string; name: string; created_at: string };
-type Citation = {
+type Evidence = {
+  rank: number;
   chunk_id: string;
   filename: string;
+  text: string;
+  score: number;
   source_type: string;
   source_start: number;
   source_end: number;
-};
-type Answer = {
-  status: "ANSWERED" | "ABSTAINED";
-  answer: string | null;
-  citations: Citation[];
-  reason: string | null;
 };
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -29,7 +26,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 export default function Home() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [courseId, setCourseId] = useState("");
-  const [answer, setAnswer] = useState<Answer | null>(null);
+  const [evidence, setEvidence] = useState<Evidence[] | null>(null);
   const [message, setMessage] = useState("Loading courses…");
   const [busy, setBusy] = useState(false);
 
@@ -102,16 +99,18 @@ export default function Home() {
     const question = new FormData(event.currentTarget).get("question");
     if (!courseId) return;
     setBusy(true);
-    setAnswer(null);
-    setMessage("Checking course evidence…");
+    setEvidence(null);
+    setMessage("Searching course evidence…");
     try {
-      setAnswer(
-        await api<Answer>(`/courses/${courseId}/questions`, {
+      const response = await api<{ items: Evidence[] }>(
+        `/courses/${courseId}/evidence`,
+        {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ question }),
-        }),
+        },
       );
+      setEvidence(response.items);
       setMessage("Ready");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Question failed");
@@ -155,37 +154,30 @@ export default function Home() {
         </aside>
         <section className="conversation">
           <div>
-            <p className="eyebrow">Evidence-bound answers</p>
-            <h2>Ask your materials</h2>
-            <p className="intro">CourseRAG searches only the selected course. If evidence is insufficient or conflicting, it abstains.</p>
+            <p className="eyebrow">Free local retrieval</p>
+            <h2>Search your materials</h2>
+            <p className="intro">CourseRAG searches only the selected course and shows the original evidence. No generation model or paid API is used.</p>
           </div>
           <form className="ask" onSubmit={ask}>
             <label htmlFor="question">Question</label>
             <textarea id="question" name="question" required maxLength={4000} placeholder="What does the course say about…?" />
-            <button disabled={busy || !courseId}>Check evidence and answer</button>
+            <button disabled={busy || !courseId}>Find course evidence</button>
           </form>
-          {answer && (
-            <article className={`result ${answer.status.toLowerCase()}`} aria-live="polite">
-              <p className="result-label">{answer.status}</p>
-              <p className="answer">{answer.answer || "I can’t answer this from the available course evidence."}</p>
-              {answer.reason && <p className="reason">Reason: {answer.reason}</p>}
-              {answer.citations.length > 0 && (
-                <>
-                  <h3>Sources</h3>
-                  <ul>
-                    {answer.citations.map((citation) => (
-                      <li key={citation.chunk_id}>
-                        <strong>{citation.filename}</strong>
-                        <span>
-                          {citation.source_type} {citation.source_start}
-                          {citation.source_end === citation.source_start ? "" : `–${citation.source_end}`}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-            </article>
+          {evidence && (
+            <section className="evidence" aria-live="polite">
+              <p className="result-label">Retrieved evidence</p>
+              {evidence.length === 0 ? (
+                <p className="reason">No course evidence was retrieved.</p>
+              ) : evidence.map((item) => (
+                <article key={item.chunk_id} className="evidence-item">
+                  <div>
+                    <strong>#{item.rank} · {item.filename}</strong>
+                    <span>{item.source_type} {item.source_start}{item.source_end === item.source_start ? "" : `–${item.source_end}`} · score {item.score.toFixed(3)}</span>
+                  </div>
+                  <p>{item.text}</p>
+                </article>
+              ))}
+            </section>
           )}
         </section>
       </div>
