@@ -80,6 +80,22 @@ class AnswerResponse(BaseModel):
     reason: str | None
 
 
+class EvidenceItemResponse(BaseModel):
+    rank: int
+    chunk_id: str
+    filename: str
+    text: str
+    score: float
+    source_type: Literal["page", "slide", "section"]
+    source_start: int
+    source_end: int
+
+
+class EvidenceResponse(BaseModel):
+    question: str
+    items: list[EvidenceItemResponse]
+
+
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
 
@@ -96,6 +112,16 @@ def get_indexer(store: Annotated[SQLiteStore, Depends(get_store)]) -> IndexingSe
         provider,
     )
     return IndexingService(store, index, provider, batch_size=settings.embedding_batch_size)
+
+
+def get_retriever(store: Annotated[SQLiteStore, Depends(get_store)]) -> Retriever:
+    provider = create_embedding_provider(settings)
+    index = QdrantVectorIndex(
+        QdrantClient(path=str(settings.qdrant_path)),
+        settings.qdrant_collection_prefix,
+        provider,
+    )
+    return Retriever(store, index, provider)
 
 
 def get_answer_service(
@@ -250,4 +276,36 @@ def answer_question(
         answer=result.answer,
         citations=[CitationResponse.model_validate(citation, from_attributes=True) for citation in result.citations],
         reason=result.reason,
+    )
+
+
+@app.post(
+    "/courses/{course_id}/evidence",
+    response_model=EvidenceResponse,
+    tags=["questions"],
+)
+def retrieve_evidence(
+    course_id: str,
+    request: QuestionRequest,
+    retriever: Annotated[Retriever, Depends(get_retriever)],
+) -> EvidenceResponse:
+    try:
+        chunks = retriever.retrieve(course_id=course_id, query=request.question, limit=5)
+    except CourseRAGError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return EvidenceResponse(
+        question=request.question,
+        items=[
+            EvidenceItemResponse(
+                rank=rank,
+                chunk_id=chunk.chunk_id,
+                filename=chunk.filename,
+                text=chunk.text,
+                score=chunk.score,
+                source_type=chunk.source_type,
+                source_start=chunk.source_start,
+                source_end=chunk.source_end,
+            )
+            for rank, chunk in enumerate(chunks, 1)
+        ],
     )

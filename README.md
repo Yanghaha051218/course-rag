@@ -17,7 +17,7 @@ evaluation, the M2-B similarity-gate baseline, evidence support verification,
 and a backend grounded-generation service. A local real-course benchmark runner
 measures those stages without committing course materials. The repository also
 has a minimal local workflow for creating a course, uploading documents, asking
-questions, and viewing grounded answers or abstentions with citations.
+questions, and viewing ranked source evidence without a paid generation API.
 
 The SupportVerifier has human-reviewed gold datasets, but its live semantic
 evaluation is still pending. Do not expose this prototype publicly: it has no
@@ -81,8 +81,9 @@ The fuller component and data-flow design is in
 - Local benchmark runner with separate retrieval, support, citation, and
   failure-analysis metrics for human-curated course questions.
 - Developer-facing ingestion CLI.
-- Local course, document-upload, and question-answering HTTP endpoints.
-- Minimal responsive Next.js interface for the end-to-end local workflow.
+- Local course, document-upload, evidence-retrieval, and grounded-generation
+  HTTP endpoints.
+- Minimal responsive Next.js interface for the free retrieval-only workflow.
 
 ## Planned features
 
@@ -163,13 +164,13 @@ Run all commands from the repository root unless a step says otherwise.
 
    Open `http://127.0.0.1:3000`.
 
-No API key is required for document ingestion or the default deterministic
-embedding provider. Answer generation and semantic support verification require
-a configured OpenAI key with available API credit; provider failures fail closed
-instead of producing an ungrounded answer. For local
-semantic retrieval, set `COURSE_RAG_EMBEDDING_PROVIDER=fastembed`; its first
+No API key is required for the frontend's retrieval-only workflow. For useful
+local semantic retrieval, set `COURSE_RAG_EMBEDDING_PROVIDER=fastembed`; its first
 use downloads `BAAI/bge-small-en-v1.5` into ignored `runtime/models/fastembed/`
-and processes course text locally. To use OpenAI embeddings instead, set
+and processes course text locally. Documents must be indexed with the same
+provider used for retrieval. The separate grounded-generation endpoint still
+requires an OpenAI key with available API credit and fails closed on provider
+errors. To use OpenAI embeddings instead, set
 `COURSE_RAG_EMBEDDING_PROVIDER=openai` and supply `OPENAI_API_KEY`; never
 commit the populated file.
 

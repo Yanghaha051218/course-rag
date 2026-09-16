@@ -3,8 +3,8 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from course_rag_api.generation import Citation, FinalResponse, FinalStatus
-from course_rag_api.main import app, get_answer_service, get_indexer, get_store
-from course_rag_api.models import IndexingSummary
+from course_rag_api.main import app, get_answer_service, get_indexer, get_retriever, get_store
+from course_rag_api.models import IndexingSummary, RetrievedChunk
 from course_rag_api.storage import SQLiteStore
 
 
@@ -90,4 +90,52 @@ def test_returns_answered_or_abstained_shape(tmp_path: Path) -> None:
         "answer": "The coefficient is 7.25.",
         "citations": [{"chunk_id": "chunk-1", "filename": "lesson.txt", "source_type": "section", "source_start": 1, "source_end": 1}],
         "reason": None,
+    }
+
+
+def test_returns_ranked_evidence_without_generation(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path / "metadata.sqlite3")
+    course = store.create_course("ODE")
+
+    class EvidenceRetriever:
+        def retrieve(self, **_: object) -> tuple[RetrievedChunk, ...]:
+            return (
+                RetrievedChunk(
+                    "chunk-1",
+                    course.id,
+                    "document-1",
+                    "lesson.md",
+                    "The coefficient is 7.25.",
+                    0.91,
+                    0,
+                    "section",
+                    2,
+                    2,
+                ),
+            )
+
+    app.dependency_overrides[get_store] = lambda: store
+    app.dependency_overrides[get_retriever] = lambda: EvidenceRetriever()
+    try:
+        response = TestClient(app).post(
+            f"/courses/{course.id}/evidence", json={"question": "What is the coefficient?"}
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "question": "What is the coefficient?",
+        "items": [
+            {
+                "rank": 1,
+                "chunk_id": "chunk-1",
+                "filename": "lesson.md",
+                "text": "The coefficient is 7.25.",
+                "score": 0.91,
+                "source_type": "section",
+                "source_start": 2,
+                "source_end": 2,
+            }
+        ],
     }
