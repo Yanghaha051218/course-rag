@@ -1,5 +1,7 @@
 # CourseRAG
 
+[中文说明](README.zh-CN.md)
+
 CourseRAG is a citation-first, closed-corpus retrieval-augmented generation
 system for course materials. Its central promise is that course-content answers
 will be grounded in evidence retrieved from materials supplied by the user.
