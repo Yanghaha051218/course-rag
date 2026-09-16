@@ -22,8 +22,8 @@ has a minimal local workflow for creating a course, uploading documents, asking
 questions, and viewing ranked source evidence without a paid generation API.
 
 The SupportVerifier has human-reviewed gold datasets, but its live semantic
-evaluation is still pending. Do not expose this prototype publicly: it has no
-authentication or multi-user access controls.
+evaluation is still pending. Do not deploy this prototype for real users yet:
+it has no authentication or multi-user access controls.
 
 ## Grounding principle
 
