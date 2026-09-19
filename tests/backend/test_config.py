@@ -59,6 +59,11 @@ def test_invalid_embedding_provider_fails_configuration_validation() -> None:
         Settings(_env_file=None, embedding_provider="unknown")
 
 
+def test_production_requires_secure_session_cookie() -> None:
+    with pytest.raises(ValidationError, match="session_cookie_secure"):
+        Settings(_env_file=None, environment="production", session_cookie_secure=False)
+
+
 def test_openai_verifier_selection_uses_configured_model() -> None:
     settings = Settings(
         _env_file=None,
