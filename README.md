@@ -27,8 +27,8 @@ their owner; it is still not production-ready.
 
 The SupportVerifier has human-reviewed gold datasets, but its live semantic
 evaluation is still pending. Do not deploy this prototype for real users yet:
-it still lacks production-grade rate limiting, account recovery, and deployment
-hardening.
+the current authentication limiter is local and per-process; account recovery
+and deployment hardening are still planned.
 
 ## Grounding principle
 

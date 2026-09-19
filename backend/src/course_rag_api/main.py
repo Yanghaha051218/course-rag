@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 from typing import Annotated, Literal
 from uuid import uuid4
@@ -131,6 +132,32 @@ class EvidenceResponse(BaseModel):
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
+_auth_attempts: dict[str, list[float]] = {}
+
+
+def enforce_auth_rate_limit(request: Request) -> None:
+    # ponytail: in-memory per-process limiter; use a shared store behind multiple workers.
+    client_key = request.client.host if request.client else "unknown"
+    now = time.monotonic()
+    window = settings.auth_rate_limit_window_seconds
+    recent = [timestamp for timestamp in _auth_attempts.get(client_key, ()) if now - timestamp < window]
+    if len(recent) >= settings.auth_rate_limit_attempts:
+        raise HTTPException(status_code=429, detail="Too many authentication attempts")
+    recent.append(now)
+    _auth_attempts[client_key] = recent
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    if settings.session_cookie_secure:
+        response.headers.setdefault(
+            "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+        )
+    return response
 
 
 def set_session_cookie(response: Response, token: str) -> None:
@@ -237,10 +264,12 @@ def health() -> HealthResponse:
     tags=["auth"],
 )
 def register(
+    http_request: Request,
     request: AuthRequest,
     response: Response,
     store: Annotated[SQLiteStore, Depends(get_store)],
 ) -> UserResponse:
+    enforce_auth_rate_limit(http_request)
     try:
         user = store.create_user(request.email, hash_password(request.password))
     except ValueError as error:
@@ -251,10 +280,12 @@ def register(
 
 @app.post("/auth/login", response_model=UserResponse, tags=["auth"])
 def login(
+    http_request: Request,
     request: AuthRequest,
     response: Response,
     store: Annotated[SQLiteStore, Depends(get_store)],
 ) -> UserResponse:
+    enforce_auth_rate_limit(http_request)
     credentials = store.get_user_credentials(request.email)
     if credentials is None or not verify_password(request.password, credentials[1]):
         raise HTTPException(status_code=401, detail="Invalid email or password")

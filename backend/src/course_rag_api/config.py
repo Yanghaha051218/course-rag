@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     session_ttl_seconds: int = Field(default=7 * 24 * 60 * 60, gt=0)
     session_cookie_name: str = Field(default="course_rag_session", min_length=1)
     session_cookie_secure: bool = False
+    auth_rate_limit_attempts: int = Field(default=10, gt=0)
+    auth_rate_limit_window_seconds: int = Field(default=15 * 60, gt=0)
 
     model_config = SettingsConfigDict(
         env_prefix="COURSE_RAG_",
@@ -50,6 +52,8 @@ class Settings(BaseSettings):
     def validate_chunk_sizes(self) -> "Settings":
         if self.chunk_overlap >= self.chunk_target_size:
             raise ValueError("chunk overlap must be smaller than target size")
+        if self.environment == "production" and not self.session_cookie_secure:
+            raise ValueError("session_cookie_secure must be enabled in production")
         return self
 
 

@@ -10,7 +10,7 @@ CourseRAG 是一个面向课程资料的 citation-first、closed-corpus RAG 系�
 
 当前项目已经包含文档解析、来源定位、切块、SQLite 元数据、向量索引、课程级检索、检索评估、证据验证、grounded generation 和 citation validation。现在还提供一个无需付费 API 的本地 retrieval-only 工作流：创建课程、上传资料、提问，并查看 Top-5 原始证据。资料列表会显示文件大小并支持删除；默认单文件上限为 50 MiB、单课程总容量为 500 MiB。当前原型还提供基于 httpOnly cookie 的本地注册/登录，并按账号隔离课程；仍不适合直接用于生产环境。
 
-SupportVerifier 已有人工审核的 gold labels，但尚未完成真实语义模型评估。当前原型仍缺少生产级限流、账号恢复和部署加固，暂不应部署给真实用户。
+SupportVerifier 已有人工审核的 gold labels，但尚未完成真实语义模型评估。当前认证限流仍是单进程本地实现；账号恢复和部署加固也仍待完成，因此暂不应部署给真实用户。
 
 ## 核心原则
 
