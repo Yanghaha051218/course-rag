@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 
 type Course = { id: string; name: string; created_at: string };
+type User = { id: string; email: string; created_at: string };
 type Document = {
   id: string;
   filename: string;
@@ -40,11 +41,49 @@ function formatBytes(bytes: number): string {
 
 export default function Home() {
   const [courses, setCourses] = useState<Course[]>([]);
+  const [user, setUser] = useState<User | null>(null);
   const [courseId, setCourseId] = useState("");
   const [documents, setDocuments] = useState<Document[]>([]);
   const [evidence, setEvidence] = useState<Evidence[] | null>(null);
   const [message, setMessage] = useState("Loading courses…");
   const [busy, setBusy] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+
+  async function authenticate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setBusy(true);
+    try {
+      const nextUser = await api<User>(`/auth/${authMode}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: form.get("email"), password: form.get("password") }),
+      });
+      setUser(nextUser);
+      setMessage("Loading your courses…");
+      await refresh();
+      event.currentTarget.reset();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Authentication failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function logout() {
+    setBusy(true);
+    try {
+      await api<void>("/auth/logout", { method: "POST" });
+    } finally {
+      setUser(null);
+      setCourses([]);
+      setCourseId("");
+      setDocuments([]);
+      setEvidence(null);
+      setMessage("Signed out");
+      setBusy(false);
+    }
+  }
 
   async function refresh() {
     try {
@@ -58,15 +97,20 @@ export default function Home() {
   }
 
   useEffect(() => {
-    void api<{ items: Course[] }>("/courses")
+    void api<User>("/auth/me")
+      .then((currentUser) => {
+        setUser(currentUser);
+        return api<{ items: Course[] }>("/courses");
+      })
       .then((data) => {
         setCourses(data.items);
         setCourseId(data.items[0]?.id || "");
         setMessage(data.items.length ? "Ready" : "Create your first course to begin.");
       })
-      .catch((error) =>
-        setMessage(error instanceof Error ? error.message : "Could not reach the API"),
-      );
+      .catch((error) => {
+        setUser(null);
+        setMessage(error instanceof Error && error.message === "Authentication required" ? "Sign in to manage your courses." : error instanceof Error ? error.message : "Could not reach the API");
+      });
   }, []);
 
   useEffect(() => {
@@ -167,8 +211,29 @@ export default function Home() {
           <p className="eyebrow">Citation-first course research</p>
           <h1>CourseRAG</h1>
         </div>
-        <p className="status" role="status">{message}</p>
+        <div className="header-actions">
+          {user && <span className="status">{user.email}</span>}
+          {user && <button type="button" className="sign-out" onClick={() => void logout()} disabled={busy}>Sign out</button>}
+          <p className="status" role="status">{message}</p>
+        </div>
       </header>
+      {!user ? (
+        <section className="auth-card" aria-labelledby="auth-heading">
+          <p className="eyebrow">Private course workspace</p>
+          <h2 id="auth-heading">{authMode === "login" ? "Sign in to CourseRAG" : "Create your CourseRAG account"}</h2>
+          <p className="intro">Your courses and uploaded materials are isolated to your account.</p>
+          <form onSubmit={authenticate}>
+            <label htmlFor="email">Email</label>
+            <input id="email" name="email" type="email" required maxLength={254} autoComplete="email" />
+            <label htmlFor="password">Password</label>
+            <input id="password" name="password" type="password" required minLength={8} maxLength={256} autoComplete={authMode === "login" ? "current-password" : "new-password"} />
+            <button disabled={busy}>{authMode === "login" ? "Sign in" : "Register"}</button>
+          </form>
+          <button type="button" className="auth-toggle" onClick={() => setAuthMode(authMode === "login" ? "register" : "login")} disabled={busy}>
+            {authMode === "login" ? "Need an account? Register" : "Already have an account? Sign in"}
+          </button>
+        </section>
+      ) : (
       <div className="workspace">
         <aside aria-label="Course setup">
           <section>
@@ -248,6 +313,7 @@ export default function Home() {
           )}
         </section>
       </div>
+      )}
     </main>
   );
 }

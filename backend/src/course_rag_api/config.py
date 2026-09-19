@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     chunk_overlap: int = Field(default=100, ge=0)
     max_document_bytes: int = Field(default=50 * 1024 * 1024, gt=0)
     max_course_bytes: int = Field(default=500 * 1024 * 1024, gt=0)
+    session_ttl_seconds: int = Field(default=7 * 24 * 60 * 60, gt=0)
+    session_cookie_name: str = Field(default="course_rag_session", min_length=1)
+    session_cookie_secure: bool = False
 
     model_config = SettingsConfigDict(
         env_prefix="COURSE_RAG_",

@@ -36,6 +36,14 @@ class Course:
     id: str
     name: str
     created_at: str
+    owner_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class User:
+    id: str
+    email: str
+    created_at: str
 
 
 @dataclass(frozen=True, slots=True)
