@@ -2,6 +2,12 @@ import base64
 import hashlib
 import hmac
 import secrets
+from datetime import datetime, timedelta, timezone
+
+from fastapi import HTTPException, Request, status
+
+from course_rag_api.models import User
+from course_rag_api.storage import SQLiteStore
 
 
 _SCRYPT_N = 2**14
@@ -62,3 +68,43 @@ def session_digest(token: str) -> str:
 
 def new_session_token() -> str:
     return secrets.token_urlsafe(32)
+
+
+def issue_session(store: SQLiteStore, user_id: str, ttl_seconds: int) -> str:
+    now = datetime.now(timezone.utc)
+    token = new_session_token()
+    store.create_session(
+        user_id,
+        session_digest(token),
+        now.isoformat(),
+        (now + timedelta(seconds=ttl_seconds)).isoformat(),
+    )
+    return token
+
+
+def authenticate_request(
+    request: Request, store: SQLiteStore, cookie_name: str
+) -> User:
+    token = request_session_token(request, cookie_name)
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    user = store.get_user_by_session(
+        session_digest(token), datetime.now(timezone.utc).isoformat()
+    )
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+
+def request_session_token(request: Request, cookie_name: str) -> str:
+    authorization = request.headers.get("authorization", "")
+    token = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
+    return token or request.cookies.get(cookie_name, "")

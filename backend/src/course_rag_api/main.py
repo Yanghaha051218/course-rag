@@ -7,6 +7,14 @@ from pydantic import BaseModel, StringConstraints
 from qdrant_client import QdrantClient
 
 from course_rag_api.config import get_settings
+from course_rag_api.auth import (
+    authenticate_request,
+    hash_password,
+    issue_session,
+    request_session_token,
+    session_digest,
+    verify_password,
+)
 from course_rag_api.embeddings import create_embedding_provider
 from course_rag_api.errors import CourseRAGError
 from course_rag_api.generation import AnswerGenerationService, create_generator
@@ -14,6 +22,7 @@ from course_rag_api.indexing import IndexingService
 from course_rag_api.ingestion import ingest_document
 from course_rag_api.parsers import SUPPORTED_EXTENSIONS
 from course_rag_api.retrieval import Retriever
+from course_rag_api.models import User
 from course_rag_api.storage import SQLiteStore
 from course_rag_api.support import SupportVerificationService, create_support_verifier
 from course_rag_api.vector_store import QdrantVectorIndex
@@ -26,6 +35,27 @@ class HealthResponse(BaseModel):
 
 
 CourseName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+Email = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=3,
+        max_length=254,
+        pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+    ),
+]
+Password = Annotated[str, StringConstraints(min_length=8, max_length=256)]
+
+
+class AuthRequest(BaseModel):
+    email: Email
+    password: Password
+
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    created_at: str
 
 
 class CreateCourseRequest(BaseModel):
@@ -103,6 +133,18 @@ settings = get_settings()
 app = FastAPI(title=settings.app_name)
 
 
+def set_session_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        settings.session_cookie_name,
+        token,
+        max_age=settings.session_ttl_seconds,
+        httponly=True,
+        secure=settings.session_cookie_secure,
+        samesite="lax",
+        path="/",
+    )
+
+
 def document_size(path: Path) -> int:
     try:
         return path.stat().st_size
@@ -126,7 +168,17 @@ def get_store() -> SQLiteStore:
     return SQLiteStore(settings.database_path)
 
 
-def get_indexer(store: Annotated[SQLiteStore, Depends(get_store)]) -> IndexingService:
+def get_current_user(
+    request: Request,
+    store: Annotated[SQLiteStore, Depends(get_store)],
+) -> User:
+    return authenticate_request(request, store, settings.session_cookie_name)
+
+
+def get_indexer(
+    store: Annotated[SQLiteStore, Depends(get_store)],
+    _user: Annotated[User, Depends(get_current_user)],
+) -> IndexingService:
     provider = create_embedding_provider(settings)
     index = QdrantVectorIndex(
         QdrantClient(path=str(settings.qdrant_path)),
@@ -136,7 +188,10 @@ def get_indexer(store: Annotated[SQLiteStore, Depends(get_store)]) -> IndexingSe
     return IndexingService(store, index, provider, batch_size=settings.embedding_batch_size)
 
 
-def get_retriever(store: Annotated[SQLiteStore, Depends(get_store)]) -> Retriever:
+def get_retriever(
+    store: Annotated[SQLiteStore, Depends(get_store)],
+    _user: Annotated[User, Depends(get_current_user)],
+) -> Retriever:
     provider = create_embedding_provider(settings)
     index = QdrantVectorIndex(
         QdrantClient(path=str(settings.qdrant_path)),
@@ -148,6 +203,7 @@ def get_retriever(store: Annotated[SQLiteStore, Depends(get_store)]) -> Retrieve
 
 def get_answer_service(
     store: Annotated[SQLiteStore, Depends(get_store)],
+    _user: Annotated[User, Depends(get_current_user)],
 ) -> AnswerGenerationService:
     provider = create_embedding_provider(settings)
     index = QdrantVectorIndex(
@@ -174,10 +230,68 @@ def health() -> HealthResponse:
     )
 
 
+@app.post(
+    "/auth/register",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["auth"],
+)
+def register(
+    request: AuthRequest,
+    response: Response,
+    store: Annotated[SQLiteStore, Depends(get_store)],
+) -> UserResponse:
+    try:
+        user = store.create_user(request.email, hash_password(request.password))
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail="Email is already registered") from error
+    set_session_cookie(response, issue_session(store, user.id, settings.session_ttl_seconds))
+    return UserResponse.model_validate(user, from_attributes=True)
+
+
+@app.post("/auth/login", response_model=UserResponse, tags=["auth"])
+def login(
+    request: AuthRequest,
+    response: Response,
+    store: Annotated[SQLiteStore, Depends(get_store)],
+) -> UserResponse:
+    credentials = store.get_user_credentials(request.email)
+    if credentials is None or not verify_password(request.password, credentials[1]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    user = credentials[0]
+    set_session_cookie(response, issue_session(store, user.id, settings.session_ttl_seconds))
+    return UserResponse.model_validate(user, from_attributes=True)
+
+
+@app.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
+def logout(
+    request: Request,
+    response: Response,
+    store: Annotated[SQLiteStore, Depends(get_store)],
+) -> Response:
+    token = request_session_token(request, settings.session_cookie_name)
+    if token:
+        store.delete_session(session_digest(token))
+    response.delete_cookie(settings.session_cookie_name, path="/")
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response
+
+
+@app.get("/auth/me", response_model=UserResponse, tags=["auth"])
+def current_user(user: Annotated[User, Depends(get_current_user)]) -> UserResponse:
+    return UserResponse.model_validate(user, from_attributes=True)
+
+
 @app.get("/courses", response_model=CourseListResponse, tags=["courses"])
-def list_courses(store: Annotated[SQLiteStore, Depends(get_store)]) -> CourseListResponse:
+def list_courses(
+    store: Annotated[SQLiteStore, Depends(get_store)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> CourseListResponse:
     return CourseListResponse(
-        items=[CourseResponse.model_validate(course, from_attributes=True) for course in store.list_courses()]
+        items=[
+            CourseResponse.model_validate(course, from_attributes=True)
+            for course in store.list_courses_for_user(user.id)
+        ]
     )
 
 
@@ -190,9 +304,10 @@ def list_courses(store: Annotated[SQLiteStore, Depends(get_store)]) -> CourseLis
 def create_course(
     request: CreateCourseRequest,
     store: Annotated[SQLiteStore, Depends(get_store)],
+    user: Annotated[User, Depends(get_current_user)],
 ) -> CourseResponse:
     return CourseResponse.model_validate(
-        store.create_course(request.name), from_attributes=True
+        store.create_course(request.name, owner_id=user.id), from_attributes=True
     )
 
 
@@ -204,24 +319,23 @@ def create_course(
 def list_documents(
     course_id: str,
     store: Annotated[SQLiteStore, Depends(get_store)],
+    user: Annotated[User, Depends(get_current_user)],
 ) -> DocumentListResponse:
-    try:
-        store.get_course(course_id)
-        return DocumentListResponse(
-            items=[
-                DocumentListItem(
-                    id=document.id,
-                    filename=document.filename,
-                    file_type=document.file_type,
-                    source_units=document.page_or_unit_count,
-                    size_bytes=document_size(Path(document.source_path)),
-                    created_at=document.created_at,
-                )
-                for document in store.list_documents(course_id)
-            ]
-        )
-    except CourseRAGError as error:
-        raise HTTPException(status_code=404, detail=str(error)) from error
+    if store.get_course_for_user(course_id, user.id) is None:
+        raise HTTPException(status_code=404, detail="Course does not exist")
+    return DocumentListResponse(
+        items=[
+            DocumentListItem(
+                id=document.id,
+                filename=document.filename,
+                file_type=document.file_type,
+                source_units=document.page_or_unit_count,
+                size_bytes=document_size(Path(document.source_path)),
+                created_at=document.created_at,
+            )
+            for document in store.list_documents(course_id)
+        ]
+    )
 
 
 @app.post(
@@ -235,15 +349,14 @@ async def upload_document(
     request: Request,
     indexer: Annotated[IndexingService, Depends(get_indexer)],
     store: Annotated[SQLiteStore, Depends(get_store)],
+    user: Annotated[User, Depends(get_current_user)],
     filename: Annotated[str, Query(min_length=1, max_length=255)],
 ) -> DocumentResponse:
     clean_name = Path(filename).name
     if clean_name != filename or Path(clean_name).suffix.lower() not in SUPPORTED_EXTENSIONS:
         raise HTTPException(status_code=422, detail="Unsupported or unsafe filename")
-    try:
-        store.get_course(course_id)
-    except CourseRAGError as error:
-        raise HTTPException(status_code=404, detail=str(error)) from error
+    if store.get_course_for_user(course_id, user.id) is None:
+        raise HTTPException(status_code=404, detail="Course does not exist")
     course_bytes = course_storage_bytes(store, course_id)
     if course_bytes >= settings.max_course_bytes:
         raise HTTPException(status_code=413, detail="Course storage quota exceeded")
@@ -295,9 +408,11 @@ def delete_document(
     document_id: str,
     indexer: Annotated[IndexingService, Depends(get_indexer)],
     store: Annotated[SQLiteStore, Depends(get_store)],
+    user: Annotated[User, Depends(get_current_user)],
 ) -> Response:
     try:
-        store.get_course(course_id)
+        if store.get_course_for_user(course_id, user.id) is None:
+            raise ValueError("course does not belong to user")
         document = store.get_document(document_id)
         if document.course_id != course_id:
             raise ValueError("document does not belong to course")
@@ -318,10 +433,14 @@ def answer_question(
     request: QuestionRequest,
     store: Annotated[SQLiteStore, Depends(get_store)],
     service: Annotated[AnswerGenerationService, Depends(get_answer_service)],
+    user: Annotated[User, Depends(get_current_user)],
 ) -> AnswerResponse:
     try:
-        store.get_course(course_id)
+        if store.get_course_for_user(course_id, user.id) is None:
+            raise HTTPException(status_code=404, detail="Course does not exist")
         result = service.answer_question(course_id=course_id, question=request.question)
+    except HTTPException:
+        raise
     except CourseRAGError as error:
         raise HTTPException(status_code=503, detail="Answer service unavailable") from error
     return AnswerResponse(
@@ -341,7 +460,11 @@ def retrieve_evidence(
     course_id: str,
     request: QuestionRequest,
     retriever: Annotated[Retriever, Depends(get_retriever)],
+    store: Annotated[SQLiteStore, Depends(get_store)],
+    user: Annotated[User, Depends(get_current_user)],
 ) -> EvidenceResponse:
+    if store.get_course_for_user(course_id, user.id) is None:
+        raise HTTPException(status_code=404, detail="Course does not exist")
     try:
         chunks = retriever.retrieve(course_id=course_id, query=request.question, limit=5)
     except CourseRAGError as error:

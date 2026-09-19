@@ -3,13 +3,28 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from course_rag_api.generation import Citation, FinalResponse, FinalStatus
-from course_rag_api.main import app, get_answer_service, get_indexer, get_retriever, get_store
+from course_rag_api.auth import hash_password
+from course_rag_api.main import (
+    app,
+    get_answer_service,
+    get_current_user,
+    get_indexer,
+    get_retriever,
+    get_store,
+)
 from course_rag_api.models import IndexingSummary, RetrievedChunk
 from course_rag_api.storage import SQLiteStore
 
 
+def _authenticate_test_user(store: SQLiteStore):
+    user = store.create_user("test@example.com", hash_password("password-123"))
+    app.dependency_overrides[get_current_user] = lambda: user
+    return user
+
+
 def test_create_and_list_courses(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path / "metadata.sqlite3")
+    _authenticate_test_user(store)
     app.dependency_overrides[get_store] = lambda: store
     client = TestClient(app)
     try:
@@ -26,6 +41,7 @@ def test_create_and_list_courses(tmp_path: Path) -> None:
 
 def test_create_course_rejects_blank_name(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path / "metadata.sqlite3")
+    _authenticate_test_user(store)
     app.dependency_overrides[get_store] = lambda: store
     try:
         response = TestClient(app).post("/courses", json={"name": "   "})
@@ -37,7 +53,8 @@ def test_create_course_rejects_blank_name(tmp_path: Path) -> None:
 
 def test_uploads_and_lists_document(tmp_path: Path, monkeypatch) -> None:
     store = SQLiteStore(tmp_path / "metadata.sqlite3")
-    course = store.create_course("ODE")
+    user = _authenticate_test_user(store)
+    course = store.create_course("ODE", owner_id=user.id)
 
     class Indexer:
         def index_document(self, document_id: str) -> IndexingSummary:
@@ -65,7 +82,8 @@ def test_uploads_and_lists_document(tmp_path: Path, monkeypatch) -> None:
 
 def test_deletes_document_and_removes_uploaded_file(tmp_path: Path, monkeypatch) -> None:
     store = SQLiteStore(tmp_path / "metadata.sqlite3")
-    course = store.create_course("ODE")
+    user = _authenticate_test_user(store)
+    course = store.create_course("ODE", owner_id=user.id)
 
     class Indexer:
         def index_document(self, document_id: str) -> IndexingSummary:
@@ -100,7 +118,8 @@ def test_deletes_document_and_removes_uploaded_file(tmp_path: Path, monkeypatch)
 
 def test_upload_rejects_course_quota(tmp_path: Path, monkeypatch) -> None:
     store = SQLiteStore(tmp_path / "metadata.sqlite3")
-    course = store.create_course("ODE")
+    user = _authenticate_test_user(store)
+    course = store.create_course("ODE", owner_id=user.id)
 
     class Indexer:
         def index_document(self, document_id: str) -> IndexingSummary:
@@ -124,7 +143,8 @@ def test_upload_rejects_course_quota(tmp_path: Path, monkeypatch) -> None:
 
 def test_returns_answered_or_abstained_shape(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path / "metadata.sqlite3")
-    course = store.create_course("ODE")
+    user = _authenticate_test_user(store)
+    course = store.create_course("ODE", owner_id=user.id)
 
     class Answers:
         def answer_question(self, **_: object) -> FinalResponse:
@@ -155,7 +175,8 @@ def test_returns_answered_or_abstained_shape(tmp_path: Path) -> None:
 
 def test_returns_ranked_evidence_without_generation(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path / "metadata.sqlite3")
-    course = store.create_course("ODE")
+    user = _authenticate_test_user(store)
+    course = store.create_course("ODE", owner_id=user.id)
 
     class EvidenceRetriever:
         def retrieve(self, **_: object) -> tuple[RetrievedChunk, ...]:

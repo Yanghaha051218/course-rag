@@ -137,6 +137,10 @@ class SQLiteStore:
             ).fetchone()
         return None if row is None else User(**dict(row))
 
+    def delete_session(self, token_hash: str) -> None:
+        with self._connect() as connection:
+            connection.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
+
     def create_course(self, name: str, owner_id: str | None = None) -> Course:
         clean_name = name.strip()
         if not clean_name:
