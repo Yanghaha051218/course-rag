@@ -40,6 +40,8 @@ def test_registered_users_only_see_their_own_courses(tmp_path: Path) -> None:
         app.dependency_overrides.clear()
 
     assert alice.status_code == 201
+    assert "httponly" in alice.headers["set-cookie"].lower()
+    assert "samesite=lax" in alice.headers["set-cookie"].lower()
     assert created.status_code == 201
     assert logged_out.status_code == 204
     assert bob.status_code == 201

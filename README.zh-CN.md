@@ -6,11 +6,11 @@ CourseRAG 是一个面向课程资料的 citation-first、closed-corpus RAG 系�
 
 ## 当前状态
 
-**早期开发 — M5-A 本地产品原型。**
+**早期开发 — M5-B 本地产品原型。**
 
-当前项目已经包含文档解析、来源定位、切块、SQLite 元数据、向量索引、课程级检索、检索评估、证据验证、grounded generation 和 citation validation。现在还提供一个无需付费 API 的本地 retrieval-only 工作流：创建课程、上传资料、提问，并查看 Top-5 原始证据。资料列表会显示文件大小并支持删除；默认单文件上限为 50 MiB、单课程总容量为 500 MiB。
+当前项目已经包含文档解析、来源定位、切块、SQLite 元数据、向量索引、课程级检索、检索评估、证据验证、grounded generation 和 citation validation。现在还提供一个无需付费 API 的本地 retrieval-only 工作流：创建课程、上传资料、提问，并查看 Top-5 原始证据。资料列表会显示文件大小并支持删除；默认单文件上限为 50 MiB、单课程总容量为 500 MiB。当前原型还提供基于 httpOnly cookie 的本地注册/登录，并按账号隔离课程；仍不适合直接用于生产环境。
 
-SupportVerifier 已有人工审核的 gold labels，但尚未完成真实语义模型评估。当前原型没有身份认证和多用户访问控制，暂不应部署给真实用户。
+SupportVerifier 已有人工审核的 gold labels，但尚未完成真实语义模型评估。当前原型仍缺少生产级限流、账号恢复和部署加固，暂不应部署给真实用户。
 
 ## 核心原则
 
@@ -49,6 +49,7 @@ SupportVerifier 已有人工审核的 gold labels，但尚未完成真实语义�
 - 仅允许已验证 chunk 的 grounded generation 和 citation validation。
 - 本地课程、上传、检索证据和 grounded-generation HTTP API。
 - 文件大小展示、课程级上传配额和课程级资料删除。
+- 本地注册/登录、会话 cookie 和按账号隔离课程 API。
 - 无需付费 API 的 Next.js retrieval-only 界面。
 
 ## 快速开始

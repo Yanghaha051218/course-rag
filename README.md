@@ -10,7 +10,7 @@ abstain instead of filling gaps with a model's pretrained knowledge.
 
 ## Status
 
-**Early development — Milestone 5-A local product prototype.**
+**Early development — Milestone 5-B local product prototype.**
 
 The repository now implements local document ingestion, source-aware parsing,
 deterministic chunking, SQLite metadata persistence, embedding providers,
@@ -22,10 +22,13 @@ has a minimal local workflow for creating a course, uploading documents, asking
 questions, and viewing ranked source evidence without a paid generation API.
 Uploaded materials can be listed and deleted; uploads are limited to 50 MiB per
 file and 500 MiB per course by default.
+The local prototype now has cookie-based account sessions and scopes courses to
+their owner; it is still not production-ready.
 
 The SupportVerifier has human-reviewed gold datasets, but its live semantic
 evaluation is still pending. Do not deploy this prototype for real users yet:
-it has no authentication or multi-user access controls.
+it still lacks production-grade rate limiting, account recovery, and deployment
+hardening.
 
 ## Grounding principle
 
@@ -89,6 +92,7 @@ The fuller component and data-flow design is in
   HTTP endpoints.
 - Document size metadata, course-level upload quotas, and course-scoped document
   deletion.
+- Local registration/login with httpOnly sessions and owner-scoped course APIs.
 - Minimal responsive Next.js interface for the free retrieval-only workflow.
 
 ## Planned features
