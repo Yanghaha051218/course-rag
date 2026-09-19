@@ -5,14 +5,31 @@ from pathlib import Path
 from uuid import uuid4
 
 from course_rag_api.errors import CourseNotFoundError, DocumentNotFoundError
-from course_rag_api.models import Chunk, Course, Document
+from course_rag_api.models import Chunk, Course, Document, User
 
 
 _SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS courses (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL CHECK (length(trim(name)) > 0),
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    owner_id TEXT,
+    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS documents (
@@ -58,6 +75,11 @@ class SQLiteStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.executescript(_SCHEMA)
+            columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(courses)")
+            }
+            if "owner_id" not in columns:
+                connection.execute("ALTER TABLE courses ADD COLUMN owner_id TEXT")
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path)
@@ -65,7 +87,57 @@ class SQLiteStore:
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
-    def create_course(self, name: str) -> Course:
+    def create_user(self, email: str, password_hash: str) -> User:
+        user = User(
+            id=str(uuid4()),
+            email=email.strip().casefold(),
+            created_at=datetime.now(timezone.utc).isoformat(),
+        )
+        try:
+            with self._connect() as connection:
+                connection.execute(
+                    "INSERT INTO users (id, email, password_hash, created_at) VALUES (?, ?, ?, ?)",
+                    (user.id, user.email, password_hash, user.created_at),
+                )
+        except sqlite3.IntegrityError as error:
+            raise ValueError("email is already registered") from error
+        return user
+
+    def get_user_credentials(self, email: str) -> tuple[User, str] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT id, email, password_hash, created_at FROM users WHERE email = ?",
+                (email.strip().casefold(),),
+            ).fetchone()
+        if row is None:
+            return None
+        values = dict(row)
+        password_hash = values.pop("password_hash")
+        return User(**values), password_hash
+
+    def create_session(
+        self, user_id: str, token_hash: str, created_at: str, expires_at: str
+    ) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+                (token_hash, user_id, created_at, expires_at),
+            )
+
+    def get_user_by_session(self, token_hash: str, now: str) -> User | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT u.id, u.email, u.created_at
+                FROM users AS u
+                JOIN sessions AS s ON s.user_id = u.id
+                WHERE s.token_hash = ? AND s.expires_at > ?
+                """,
+                (token_hash, now),
+            ).fetchone()
+        return None if row is None else User(**dict(row))
+
+    def create_course(self, name: str, owner_id: str | None = None) -> Course:
         clean_name = name.strip()
         if not clean_name:
             raise ValueError("course name must not be empty")
@@ -73,18 +145,19 @@ class SQLiteStore:
             id=str(uuid4()),
             name=clean_name,
             created_at=datetime.now(timezone.utc).isoformat(),
+            owner_id=owner_id,
         )
         with self._connect() as connection:
             connection.execute(
-                "INSERT INTO courses (id, name, created_at) VALUES (?, ?, ?)",
-                (course.id, course.name, course.created_at),
+                "INSERT INTO courses (id, name, created_at, owner_id) VALUES (?, ?, ?, ?)",
+                (course.id, course.name, course.created_at, course.owner_id),
             )
         return course
 
     def get_course(self, course_id: str) -> Course:
         with self._connect() as connection:
             row = connection.execute(
-                "SELECT id, name, created_at FROM courses WHERE id = ?",
+                "SELECT id, name, created_at, owner_id FROM courses WHERE id = ?",
                 (course_id,),
             ).fetchone()
         if row is None:
@@ -94,9 +167,34 @@ class SQLiteStore:
     def list_courses(self) -> tuple[Course, ...]:
         with self._connect() as connection:
             rows = connection.execute(
-                "SELECT id, name, created_at FROM courses ORDER BY created_at, id"
+                "SELECT id, name, created_at, owner_id FROM courses ORDER BY created_at, id"
             ).fetchall()
         return tuple(Course(**dict(row)) for row in rows)
+
+    def list_courses_for_user(self, owner_id: str) -> tuple[Course, ...]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, name, created_at, owner_id
+                FROM courses
+                WHERE owner_id = ?
+                ORDER BY created_at, id
+                """,
+                (owner_id,),
+            ).fetchall()
+        return tuple(Course(**dict(row)) for row in rows)
+
+    def get_course_for_user(self, course_id: str, owner_id: str) -> Course | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT id, name, created_at, owner_id
+                FROM courses
+                WHERE id = ? AND owner_id = ?
+                """,
+                (course_id, owner_id),
+            ).fetchone()
+        return None if row is None else Course(**dict(row))
 
     def find_document_by_checksum(
         self, course_id: str, checksum: str
