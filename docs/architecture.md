@@ -2,12 +2,14 @@
 
 ## Scope and status
 
-Milestone 4-A implements local document parsing and persistence, embedding,
+The repository implements local document parsing and persistence, embedding,
 Qdrant indexing, course-scoped retrieval, offline retrieval evaluation, the
 M2-B similarity baseline, support verification, a backend grounded-answer
-service, and a local benchmark runner. The FastAPI surface remains the
-Milestone 0 `/health` endpoint, and the Next.js page remains static. The answer
-service is not exposed by HTTP; it is exercised locally by the benchmark runner.
+service, and a local benchmark runner. The current FastAPI surface also
+provides cookie-based authentication, owner-scoped course and document APIs,
+evidence retrieval, and a grounded-question endpoint. The Next.js page provides
+a minimal local interface for authentication, course management, uploads, and
+retrieval-only evidence inspection.
 
 ## Primary invariant
 
@@ -56,16 +58,18 @@ flowchart TD
 
 ### Web application
 
-The Next.js frontend will present course selection, document-management status,
-questions, answers, citations, and abstention states. It will communicate with
-the backend through typed HTTP contracts. It remains static in Milestone 2-B.
+The Next.js frontend presents authentication, course selection,
+document-management status, uploads, and retrieval evidence. It communicates
+with the backend through typed HTTP contracts. Grounded generation remains
+available through the backend when a configured generation provider is enabled.
 
 ### API and orchestration
 
-The FastAPI backend owns request validation and the answer workflow. Planned
-orchestration responsibilities are course authorization, retrieval, evidence
-gating, provider invocation, citation validation, and stable response shapes.
-The only current endpoint is `GET /health`.
+The FastAPI backend owns request validation, account sessions, course
+authorization, retrieval, evidence gating, provider invocation, citation
+validation, and stable response shapes. Current endpoint groups include
+`/health`, `/auth/*`, `/courses`, course document management, `/evidence`, and
+`/questions`.
 
 ### Ingestion pipeline
 
@@ -205,4 +209,5 @@ The grounded service returns a stable discriminated outcome:
 - `ABSTAINED`: explicit abstention without a generation call when evidence is
   insufficient or conflicting, or after a generator/citation validation failure.
 
-The precise HTTP endpoint and wire schema remain a later milestone.
+The HTTP endpoint and wire schemas are implemented for the local prototype;
+deployment hardening and broader product workflows remain later milestones.
