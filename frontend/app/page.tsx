@@ -3,6 +3,14 @@
 import { FormEvent, useEffect, useState } from "react";
 
 type Course = { id: string; name: string; created_at: string };
+type Document = {
+  id: string;
+  filename: string;
+  file_type: string;
+  source_units: number;
+  size_bytes: number;
+  created_at: string;
+};
 type Evidence = {
   rank: number;
   chunk_id: string;
@@ -20,12 +28,20 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await response.json().catch(() => ({}));
     throw new Error(body.detail || "Request failed");
   }
+  if (response.status === 204) return undefined as T;
   return response.json();
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export default function Home() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [courseId, setCourseId] = useState("");
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [evidence, setEvidence] = useState<Evidence[] | null>(null);
   const [message, setMessage] = useState("Loading courses…");
   const [busy, setBusy] = useState(false);
@@ -52,6 +68,15 @@ export default function Home() {
         setMessage(error instanceof Error ? error.message : "Could not reach the API"),
       );
   }, []);
+
+  useEffect(() => {
+    if (!courseId) {
+      return;
+    }
+    void api<{ items: Document[] }>(`/courses/${courseId}/documents`)
+      .then((data) => setDocuments(data.items))
+      .catch((error) => setMessage(error instanceof Error ? error.message : "Could not load documents"));
+  }, [courseId]);
 
   async function createCourse(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -86,9 +111,25 @@ export default function Home() {
         body: file,
       });
       event.currentTarget.reset();
+      const documents = await api<{ items: Document[] }>(`/courses/${courseId}/documents`);
+      setDocuments(documents.items);
       setMessage(`${file.name} is indexed and ready.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeDocument(document: Document) {
+    if (!courseId || !window.confirm(`Delete ${document.filename}?`)) return;
+    setBusy(true);
+    try {
+      await api(`/courses/${courseId}/documents/${document.id}`, { method: "DELETE" });
+      setDocuments((items) => items.filter((item) => item.id !== document.id));
+      setMessage(`${document.filename} was deleted.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not delete document");
     } finally {
       setBusy(false);
     }
@@ -133,7 +174,7 @@ export default function Home() {
           <section>
             <h2>Your course</h2>
             <label htmlFor="course">Selected course</label>
-            <select id="course" value={courseId} onChange={(event) => setCourseId(event.target.value)} disabled={busy}>
+            <select id="course" value={courseId} onChange={(event) => { setCourseId(event.target.value); if (!event.target.value) setDocuments([]); }} disabled={busy}>
               <option value="">Choose a course</option>
               {courses.map((course) => <option key={course.id} value={course.id}>{course.name}</option>)}
             </select>
@@ -149,8 +190,34 @@ export default function Home() {
             <label htmlFor="document">Add course material</label>
             <input id="document" name="document" type="file" required accept=".pdf,.pptx,.docx,.md,.txt" />
             <button disabled={busy || !courseId}>Upload and index</button>
-            <small>PDF, PPTX, DOCX, Markdown or text · 50 MB max</small>
+            <small>PDF, PPTX, DOCX, Markdown or text · 50 MB per file · course quota enforced by the server</small>
           </form>
+          <section className="documents" aria-labelledby="documents-heading">
+            <h2 id="documents-heading">Course materials</h2>
+            {!courseId || documents.length === 0 ? (
+              <p className="reason">No materials uploaded yet.</p>
+            ) : (
+              <ul>
+                {documents.map((document) => (
+                  <li key={document.id} className="document-item">
+                    <div>
+                      <strong>{document.filename}</strong>
+                      <span>{formatBytes(document.size_bytes)} · {document.source_units} source units</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="document-delete"
+                      aria-label={`Delete ${document.filename}`}
+                      disabled={busy}
+                      onClick={() => void removeDocument(document)}
+                    >
+                      Delete
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </aside>
         <section className="conversation">
           <div>

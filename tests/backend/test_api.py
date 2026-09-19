@@ -60,6 +60,66 @@ def test_uploads_and_lists_document(tmp_path: Path, monkeypatch) -> None:
     assert uploaded.status_code == 201
     assert uploaded.json()["filename"] == "lesson.txt"
     assert listed.json()["items"][0]["id"] == uploaded.json()["id"]
+    assert listed.json()["items"][0]["size_bytes"] == len(b"The coefficient is 7.25.")
+
+
+def test_deletes_document_and_removes_uploaded_file(tmp_path: Path, monkeypatch) -> None:
+    store = SQLiteStore(tmp_path / "metadata.sqlite3")
+    course = store.create_course("ODE")
+
+    class Indexer:
+        def index_document(self, document_id: str) -> IndexingSummary:
+            return IndexingSummary(course.id, document_id, 1, 1, "test")
+
+        def delete_document(self, course_id: str, document_id: str):
+            return store.delete_document(course_id, document_id)
+
+    app.dependency_overrides[get_store] = lambda: store
+    app.dependency_overrides[get_indexer] = lambda: Indexer()
+    monkeypatch.setattr("course_rag_api.main.settings.upload_path", tmp_path / "uploads")
+    client = TestClient(app)
+    try:
+        uploaded = client.post(
+            f"/courses/{course.id}/documents?filename=lesson.txt",
+            content=b"The coefficient is 7.25.",
+            headers={"content-type": "application/octet-stream"},
+        )
+        uploaded_path = next((tmp_path / "uploads").rglob("lesson.txt"))
+        deleted = client.delete(
+            f"/courses/{course.id}/documents/{uploaded.json()['id']}"
+        )
+        listed = client.get(f"/courses/{course.id}/documents")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert uploaded.status_code == 201
+    assert deleted.status_code == 204
+    assert not uploaded_path.exists()
+    assert listed.json() == {"items": []}
+
+
+def test_upload_rejects_course_quota(tmp_path: Path, monkeypatch) -> None:
+    store = SQLiteStore(tmp_path / "metadata.sqlite3")
+    course = store.create_course("ODE")
+
+    class Indexer:
+        def index_document(self, document_id: str) -> IndexingSummary:
+            return IndexingSummary(course.id, document_id, 1, 1, "test")
+
+    app.dependency_overrides[get_store] = lambda: store
+    app.dependency_overrides[get_indexer] = lambda: Indexer()
+    monkeypatch.setattr("course_rag_api.main.settings.upload_path", tmp_path / "uploads")
+    monkeypatch.setattr("course_rag_api.main.settings.max_course_bytes", 5)
+    try:
+        response = TestClient(app).post(
+            f"/courses/{course.id}/documents?filename=lesson.txt",
+            content=b"123456",
+            headers={"content-type": "application/octet-stream"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 413
 
 
 def test_returns_answered_or_abstained_shape(tmp_path: Path) -> None:

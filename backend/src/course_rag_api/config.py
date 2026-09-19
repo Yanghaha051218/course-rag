@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     chunk_target_size: int = Field(default=600, gt=0)
     chunk_overlap: int = Field(default=100, ge=0)
     max_document_bytes: int = Field(default=50 * 1024 * 1024, gt=0)
+    max_course_bytes: int = Field(default=500 * 1024 * 1024, gt=0)
 
     model_config = SettingsConfigDict(
         env_prefix="COURSE_RAG_",

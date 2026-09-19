@@ -1,5 +1,5 @@
 from course_rag_api.embeddings import EmbeddingProvider
-from course_rag_api.models import Chunk, IndexingSummary
+from course_rag_api.models import Chunk, Document, IndexingSummary
 from course_rag_api.storage import SQLiteStore
 from course_rag_api.vector_store import QdrantVectorIndex
 
@@ -32,6 +32,14 @@ class IndexingService:
             chunks=chunks,
             filenames={document.id: document.filename},
         )
+
+    def delete_document(self, course_id: str, document_id: str) -> Document:
+        document = self.store.get_document(document_id)
+        if document.course_id != course_id:
+            raise ValueError("document does not belong to course")
+        chunks = self.store.list_document_chunks(course_id, document_id)
+        self.vector_index.delete_chunk_ids([chunk.id for chunk in chunks])
+        return self.store.delete_document(course_id, document_id)
 
     def index_course(self, course_id: str) -> IndexingSummary:
         self.store.get_course(course_id)
