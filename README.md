@@ -10,7 +10,7 @@ abstain instead of filling gaps with a model's pretrained knowledge.
 
 ## Status
 
-**Early development — Milestone 5-B local product prototype.**
+**Early development — Milestone 5-C local product prototype.**
 
 The repository now implements local document ingestion, source-aware parsing,
 deterministic chunking, SQLite metadata persistence, embedding providers,
@@ -22,8 +22,9 @@ has a minimal local workflow for creating a course, uploading documents, asking
 questions, and viewing ranked source evidence without a paid generation API.
 Uploaded materials can be listed and deleted; uploads are limited to 50 MiB per
 file and 500 MiB per course by default.
-The local prototype now has cookie-based account sessions and scopes courses to
-their owner; it is still not production-ready.
+The local prototype now has cookie-based account sessions, scopes courses to
+their owner, and includes basic API security hardening; it is still not
+production-ready.
 
 The SupportVerifier has human-reviewed gold datasets, but its live semantic
 evaluation is still pending. Do not deploy this prototype for real users yet:
@@ -98,7 +99,8 @@ The fuller component and data-flow design is in
 ## Planned features
 
 - Additional embedding and generation providers.
-- Authentication, deployment hardening, and conversation history.
+- Account recovery, shared production rate limiting, deployment hardening, and
+  conversation history.
 
 These are roadmap items, not claims about the current implementation.
 
