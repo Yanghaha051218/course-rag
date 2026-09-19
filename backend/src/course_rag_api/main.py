@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Annotated, Literal
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, StringConstraints
 from qdrant_client import QdrantClient
 
@@ -48,6 +48,7 @@ class DocumentResponse(BaseModel):
     file_type: str
     source_units: int
     chunks: int
+    size_bytes: int
 
 
 class DocumentListItem(BaseModel):
@@ -55,6 +56,8 @@ class DocumentListItem(BaseModel):
     filename: str
     file_type: str
     source_units: int
+    size_bytes: int
+    created_at: str
 
 
 class DocumentListResponse(BaseModel):
@@ -98,6 +101,25 @@ class EvidenceResponse(BaseModel):
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
+
+
+def document_size(path: Path) -> int:
+    try:
+        return path.stat().st_size
+    except OSError:
+        return 0
+
+
+def course_storage_bytes(store: SQLiteStore, course_id: str) -> int:
+    return sum(document_size(Path(document.source_path)) for document in store.list_documents(course_id))
+
+
+def remove_uploaded_file(path: Path) -> None:
+    try:
+        path.resolve().relative_to(settings.upload_path.resolve())
+    except ValueError:
+        return
+    path.unlink(missing_ok=True)
 
 
 def get_store() -> SQLiteStore:
@@ -192,6 +214,8 @@ def list_documents(
                     filename=document.filename,
                     file_type=document.file_type,
                     source_units=document.page_or_unit_count,
+                    size_bytes=document_size(Path(document.source_path)),
+                    created_at=document.created_at,
                 )
                 for document in store.list_documents(course_id)
             ]
@@ -220,6 +244,9 @@ async def upload_document(
         store.get_course(course_id)
     except CourseRAGError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+    course_bytes = course_storage_bytes(store, course_id)
+    if course_bytes >= settings.max_course_bytes:
+        raise HTTPException(status_code=413, detail="Course storage quota exceeded")
     upload_dir = settings.upload_path / course_id / str(uuid4())
     upload_dir.mkdir(parents=True, exist_ok=False)
     path = upload_dir / clean_name
@@ -230,6 +257,8 @@ async def upload_document(
                 size += len(block)
                 if size > settings.max_document_bytes:
                     raise HTTPException(status_code=413, detail="Document is too large")
+                if course_bytes + size > settings.max_course_bytes:
+                    raise HTTPException(status_code=413, detail="Course storage quota exceeded")
                 target.write(block)
         summary = ingest_document(
             store=store,
@@ -252,7 +281,31 @@ async def upload_document(
         file_type=summary.file_type,
         source_units=summary.source_unit_count,
         chunks=summary.chunk_count,
+        size_bytes=size,
     )
+
+
+@app.delete(
+    "/courses/{course_id}/documents/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["documents"],
+)
+def delete_document(
+    course_id: str,
+    document_id: str,
+    indexer: Annotated[IndexingService, Depends(get_indexer)],
+    store: Annotated[SQLiteStore, Depends(get_store)],
+) -> Response:
+    try:
+        store.get_course(course_id)
+        document = store.get_document(document_id)
+        if document.course_id != course_id:
+            raise ValueError("document does not belong to course")
+        indexer.delete_document(course_id, document_id)
+        remove_uploaded_file(Path(document.source_path))
+    except (CourseRAGError, ValueError) as error:
+        raise HTTPException(status_code=404, detail="Document does not exist") from error
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.post(

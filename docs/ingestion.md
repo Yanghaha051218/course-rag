@@ -76,4 +76,5 @@ database, including a temporary database for testing.
   semantic document tree.
 - Embedding and retrieval are separate commands; ingestion never calls an
   external embedding provider automatically.
-- No generation, evidence gate, OCR, or upload UI exists yet.
+- No OCR, generation, or evidence gate is performed by the ingestion path; the
+  local product prototype provides upload and document-management endpoints.

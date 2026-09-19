@@ -76,3 +76,16 @@ def test_store_rejects_document_for_missing_course(tmp_path: Path) -> None:
         store.persist_document(
             _document("document-a", "missing-course", "a" * 64), ()
         )
+
+
+def test_store_deletes_document_and_its_chunks(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path / "metadata.sqlite3")
+    course = store.create_course("Course A")
+    document = _document("document-a", course.id, "a" * 64)
+    store.persist_document(document, (_chunk("chunk-a", document.id, course.id, "A"),))
+
+    deleted = store.delete_document(course.id, document.id)
+
+    assert deleted == document
+    assert store.list_documents(course.id) == ()
+    assert store.list_chunks(course.id) == ()

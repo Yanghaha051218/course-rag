@@ -10,7 +10,7 @@ abstain instead of filling gaps with a model's pretrained knowledge.
 
 ## Status
 
-**Early development — Milestone 4-B local product prototype.**
+**Early development — Milestone 5-A local product prototype.**
 
 The repository now implements local document ingestion, source-aware parsing,
 deterministic chunking, SQLite metadata persistence, embedding providers,
@@ -20,6 +20,8 @@ and a backend grounded-generation service. A local real-course benchmark runner
 measures those stages without committing course materials. The repository also
 has a minimal local workflow for creating a course, uploading documents, asking
 questions, and viewing ranked source evidence without a paid generation API.
+Uploaded materials can be listed and deleted; uploads are limited to 50 MiB per
+file and 500 MiB per course by default.
 
 The SupportVerifier has human-reviewed gold datasets, but its live semantic
 evaluation is still pending. Do not deploy this prototype for real users yet:
@@ -85,6 +87,8 @@ The fuller component and data-flow design is in
 - Developer-facing ingestion CLI.
 - Local course, document-upload, evidence-retrieval, and grounded-generation
   HTTP endpoints.
+- Document size metadata, course-level upload quotas, and course-scoped document
+  deletion.
 - Minimal responsive Next.js interface for the free retrieval-only workflow.
 
 ## Planned features

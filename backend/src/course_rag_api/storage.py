@@ -184,6 +184,17 @@ class SQLiteStore:
             ).fetchall()
         return tuple(Document(**dict(row)) for row in rows)
 
+    def delete_document(self, course_id: str, document_id: str) -> Document:
+        document = self.get_document(document_id)
+        if document.course_id != course_id:
+            raise DocumentNotFoundError(f"Document does not exist: {document_id}")
+        with self._connect() as connection:
+            connection.execute(
+                "DELETE FROM documents WHERE id = ? AND course_id = ?",
+                (document_id, course_id),
+            )
+        return document
+
     def list_chunks(self, course_id: str) -> tuple[Chunk, ...]:
         with self._connect() as connection:
             rows = connection.execute(

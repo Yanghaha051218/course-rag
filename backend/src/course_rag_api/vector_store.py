@@ -124,6 +124,16 @@ class QdrantVectorIndex:
             ],
         )
 
+    def delete_chunk_ids(self, chunk_ids: list[str]) -> None:
+        if not chunk_ids:
+            return
+        self.ensure_collection()
+        self.client.delete(
+            collection_name=self.collection_name,
+            points_selector=models.PointIdsList(points=chunk_ids),
+            wait=True,
+        )
+
     def search(
         self, *, course_id: str, vector: list[float], limit: int
     ) -> tuple[VectorMatch, ...]:

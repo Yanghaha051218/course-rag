@@ -91,6 +91,25 @@ def test_indexing_preserves_payload_dimension_and_is_idempotent(
     }
 
 
+def test_delete_document_removes_metadata_and_vector_chunks(tmp_path: Path) -> None:
+    store, _, client, index, indexing, _ = _services(tmp_path)
+    course = store.create_course("Orbital Gardening")
+    document_id = _ingest(
+        store,
+        course.id,
+        tmp_path / "blueleaf.txt",
+        "The Blueleaf coefficient is 7.25.",
+    )
+    chunk_id = store.list_chunks(course.id)[0].id
+    indexing.index_document(document_id)
+
+    deleted = indexing.delete_document(course.id, document_id)
+
+    assert deleted.id == document_id
+    assert store.list_documents(course.id) == ()
+    assert client.retrieve(index.collection_name, [chunk_id]) == []
+
+
 def test_empty_course_indexes_nothing(tmp_path: Path) -> None:
     store, _, _, _, indexing, _ = _services(tmp_path)
     course = store.create_course("Empty Course")
